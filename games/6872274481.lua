@@ -5131,10 +5131,9 @@ run(function()
     local Diagonal
     local LimitItem
     local Mouse
-    local TowerCPS -- CPS slider for Tower
     local adjacent, lastpos, label = {}, Vector3.zero
+    local towerSpeed = 1  -- Default speed
 
-    -- Generate adjacent positions
     for x = -3, 3, 3 do
         for y = -3, 3, 3 do
             for z = -3, 3, 3 do
@@ -5146,12 +5145,18 @@ run(function()
         end
     end
 
-    -- Function to find the nearest block position
+    local function nearCorner(poscheck, pos)
+        local startpos = poscheck - Vector3.new(3, 3, 3)
+        local endpos = poscheck + Vector3.new(3, 3, 3)
+        local check = poscheck + (pos - poscheck).Unit * 100
+        return Vector3.new(math.clamp(check.X, startpos.X, endpos.X), math.clamp(check.Y, startpos.Y, endpos.Y), math.clamp(check.Z, startpos.Z, endpos.Z))
+    end
+
     local function blockProximity(pos)
         local mag, returned = 60
         local tab = getBlocksInPoints(bedwars.BlockController:getBlockPosition(pos - Vector3.new(21, 21, 21)), bedwars.BlockController:getBlockPosition(pos + Vector3.new(21, 21, 21)))
         for _, v in tab do
-            local blockpos = v
+            local blockpos = nearCorner(v, pos)
             local newmag = (pos - blockpos).Magnitude
             if newmag < mag then
                 mag, returned = newmag, blockpos
@@ -5161,7 +5166,6 @@ run(function()
         return returned
     end
 
-    -- Function to check adjacent blocks
     local function checkAdjacent(pos)
         for _, v in adjacent do
             if getPlacedBlock(pos + v) then
@@ -5171,7 +5175,6 @@ run(function()
         return false
     end
 
-    -- Function to get the scaffold block (wool or any block)
     local function getScaffoldBlock()
         if store.hand.toolType == 'block' then
             return store.hand.tool.Name, store.hand.amount
@@ -5187,17 +5190,10 @@ run(function()
                 end
             end
         end
+
         return nil, 0
     end
 
-    -- Function to place blocks with CPS control
-    local function placeBlockWithCPS(blockpos, wool, cps)
-        local delay = 1 / cps
-        task.spawn(bedwars.placeBlock, blockpos, wool, false)
-        task.wait(delay)
-    end
-
-    -- Scaffold Module
     Scaffold = vape.Categories.Utility:CreateModule({
         Name = 'Scaffold',
         Function = function(callback)
@@ -5210,56 +5206,56 @@ run(function()
                     if entitylib.isAlive then
                         local wool, amount = getScaffoldBlock()
 
-                        -- Check if mouse is required
                         if Mouse.Enabled then
                             if not inputService:IsMouseButtonPressed(0) then
                                 wool = nil
                             end
                         end
 
-                        -- Update block count label
                         if label then
                             amount = amount or 0
                             label.Text = amount..' <font color="rgb(170, 170, 170)">(Scaffold)</font>'
                             label.TextColor3 = Color3.fromHSV((amount / 128) / 2.8, 0.86, 1)
                         end
 
-                        -- Place blocks if wool is available
                         if wool then
                             local root = entitylib.character.RootPart
-
-                            -- Tower feature
                             if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
                                 root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                            end
 
-                                -- Calculate block position
-                                local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0))
+                            for i = Expand.Value, 1, -1 do
+                                local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (i * 3))
+                                if Diagonal.Enabled then
+                                    if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
+                                        local dt = (lastpos - currentpos)
+                                        if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
+                                            currentpos = lastpos
+                                        end
+                                    end
+                                end
+
                                 local block, blockpos = getPlacedBlock(currentpos)
-
-                                -- Place block if no block exists
                                 if not block then
                                     blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
                                     if blockpos then
-                                        placeBlockWithCPS(blockpos, wool, TowerCPS.Value)
+                                        task.spawn(bedwars.placeBlock, blockpos, wool, false)
                                     end
                                 end
+                                lastpos = currentpos
                             end
                         end
                     end
 
-                    task.wait(0.03)
+                    task.wait(0.03 / towerSpeed)  -- Adjust delay based on towerSpeed
                 until not Scaffold.Enabled
             else
-                if label then
-                    label:Destroy()
-                    label = nil
-                end
+                Label = nil
             end
         end,
         Tooltip = 'Helps you make bridges/scaffold walk.'
     })
 
-    -- Scaffold Options
     Expand = Scaffold:CreateSlider({
         Name = 'Expand',
         Min = 1,
@@ -5285,15 +5281,17 @@ run(function()
 
     Mouse = Scaffold:CreateToggle({Name = 'Require mouse down'})
 
-    -- Tower CPS Slider
-    TowerCPS = Scaffold:CreateSlider({
-        Name = 'Tower CPS',
+    -- New Tower Speed Slider
+    local SpeedSlider = Scaffold:CreateSlider({
+        Name = 'Tower Speed',
         Min = 1,
-        Max = 12,
-        Default = 12
+        Max = 10,  -- Maximum speed multiplier
+        Default = 1,
+        Function = function(value)
+            towerSpeed = value  -- Update the speed when the slider changes
+        end
     })
 
-    -- Block Count Label
     Count = Scaffold:CreateToggle({
         Name = 'Block Count',
         Function = function(callback)
@@ -5311,10 +5309,8 @@ run(function()
                 label.Visible = Scaffold.Enabled
                 label.Parent = vape.gui
             else
-                if label then
-                    label:Destroy()
-                    label = nil
-                end
+                label:Destroy()
+                label = nil
             end
         end
     })
