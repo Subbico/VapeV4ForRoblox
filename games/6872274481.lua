@@ -5131,8 +5131,7 @@ run(function()
     local Diagonal
     local LimitItem
     local Mouse
-    local Speed
-    local TowerVelocity
+    local TowerCPS -- New CPS slider for Tower
     local adjacent, lastpos, label = {}, Vector3.zero
 
     for x = -3, 3, 3 do
@@ -5144,6 +5143,36 @@ run(function()
                 end
             end
         end
+    end
+
+    local function nearCorner(poscheck, pos)
+        local startpos = poscheck - Vector3.new(3, 3, 3)
+        local endpos = poscheck + Vector3.new(3, 3, 3)
+        local check = poscheck + (pos - poscheck).Unit * 100
+        return Vector3.new(math.clamp(check.X, startpos.X, endpos.X), math.clamp(check.Y, startpos.Y, endpos.Y), math.clamp(check.Z, startpos.Z, endpos.Z))
+    end
+
+    local function blockProximity(pos)
+        local mag, returned = 60
+        local tab = getBlocksInPoints(bedwars.BlockController:getBlockPosition(pos - Vector3.new(21, 21, 21)), bedwars.BlockController:getBlockPosition(pos + Vector3.new(21, 21, 21)))
+        for _, v in tab do
+            local blockpos = nearCorner(v, pos)
+            local newmag = (pos - blockpos).Magnitude
+            if newmag < mag then
+                mag, returned = newmag, blockpos
+            end
+        end
+        table.clear(tab)
+        return returned
+    end
+
+    local function checkAdjacent(pos)
+        for _, v in adjacent do
+            if getPlacedBlock(pos + v) then
+                return true
+            end
+        end
+        return false
     end
 
     local function getScaffoldBlock()
@@ -5192,30 +5221,24 @@ run(function()
                         if wool then
                             local root = entitylib.character.RootPart
                             if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
-                                -- Apply increased vertical velocity for faster and higher ascent
-                                root.Velocity = Vector3.new(root.Velocity.X, TowerVelocity.Value, root.Velocity.Z)
-                            end
+                                root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
 
-                            -- Rapid block placement loop
-                            for i = Expand.Value, 1, -1 do
-                                local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (i * 3))
-                                if Diagonal.Enabled then
-                                    if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
-                                        local dt = (lastpos - currentpos)
-                                        if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
-                                            currentpos = lastpos
-                                        end
+                                -- Use TowerCPS to control block placement speed
+                                local delay = 1 / TowerCPS.Value
+                                local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0))
+                                local block, blockpos = getPlacedBlock(currentpos)
+                                if not block then
+                                    blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
+                                    if blockpos then
+                                        task.spawn(bedwars.placeBlock, blockpos, wool, false)
                                     end
                                 end
-
-                                -- Place block without unnecessary checks
-                                task.spawn(bedwars.placeBlock, currentpos, wool, false)
+                                task.wait(delay) -- Wait based on CPS
                             end
                         end
                     end
 
-                    -- Minimal delay for maximum speed
-                    task.wait(Speed.Value / 1000) -- Convert slider value to a delay (e.g., 0.1 = 0.0001 seconds, 10 = 0.01 seconds)
+                    task.wait(0.03)
                 until not Scaffold.Enabled
             else
                 Label = nil
@@ -5249,23 +5272,14 @@ run(function()
 
     Mouse = Scaffold:CreateToggle({Name = 'Require mouse down'})
 
-    Speed = Scaffold:CreateSlider({
-        Name = 'Speed',
-        Min = 0.01,  -- Minimum delay (extremely fast)
-        Max = 10,     -- Maximum delay (slower)
-        Default = 0.1, -- Default delay (0.1 = 0.0001 seconds)
-        Function = function(value)
-            -- Optional: Add functionality to update the speed dynamically
-        end
-    })
-
-    TowerVelocity = Scaffold:CreateSlider({
-        Name = 'Tower Velocity',
-        Min = 30,  -- Minimum velocity (default speed)
-        Max = 100, -- Maximum velocity (very fast)
-        Default = 60, -- Default velocity (adjust as needed)
-        Function = function(value)
-            -- Update the tower velocity dynamically
+    -- New CPS Slider for Tower
+    TowerCPS = Scaffold:CreateSlider({
+        Name = 'Tower CPS',
+        Min = 1,
+        Max = 12,
+        Default = 12,
+        Function = function(val)
+            -- Update CPS value for Tower
         end
     })
 
