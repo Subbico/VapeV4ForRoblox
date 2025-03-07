@@ -5234,6 +5234,28 @@ run(function()
                                     end
                                 end
                                 task.wait(delay) -- Wait based on CPS
+                            else
+                                -- Normal Scaffold logic (non-Tower)
+                                for i = Expand.Value, 1, -1 do
+                                    local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (i * 3))
+                                    if Diagonal.Enabled then
+                                        if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
+                                            local dt = (lastpos - currentpos)
+                                            if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
+                                                currentpos = lastpos
+                                            end
+                                        end
+                                    end
+
+                                    local block, blockpos = getPlacedBlock(currentpos)
+                                    if not block then
+                                        blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
+                                        if blockpos then
+                                            task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                        end
+                                    end
+                                    lastpos = currentpos
+                                end
                             end
                         end
                     end
@@ -5241,7 +5263,10 @@ run(function()
                     task.wait(0.03)
                 until not Scaffold.Enabled
             else
-                Label = nil
+                if label then
+                    label:Destroy()
+                    label = nil
+                end
             end
         end,
         Tooltip = 'Helps you make bridges/scaffold walk.'
@@ -5277,10 +5302,7 @@ run(function()
         Name = 'Tower CPS',
         Min = 1,
         Max = 12,
-        Default = 12,
-        Function = function(val)
-            -- Update CPS value for Tower
-        end
+        Default = 12
     })
 
     Count = Scaffold:CreateToggle({
@@ -5300,13 +5322,14 @@ run(function()
                 label.Visible = Scaffold.Enabled
                 label.Parent = vape.gui
             else
-                label:Destroy()
-                label = nil
+                if label then
+                    label:Destroy()
+                    label = nil
+                end
             end
         end
     })
-end)
-	
+end)	
 run(function()
 	local ShopTierBypass
 	local tiered, nexttier = {}, {}
