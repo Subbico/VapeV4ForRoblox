@@ -5131,6 +5131,7 @@ run(function()
 	local Diagonal
 	local LimitItem
 	local Mouse
+	local CPS
 	local adjacent, lastpos, label = {}, Vector3.zero
 	
 	for x = -3, 3, 3 do
@@ -5221,32 +5222,31 @@ run(function()
 							local root = entitylib.character.RootPart
 							if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
 								root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
-							end
-	
-							for i = Expand.Value, 1, -1 do
-								local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (i * 3))
-								if Diagonal.Enabled then
-									if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
-										local dt = (lastpos - currentpos)
-										if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
-											currentpos = lastpos
+								for i = 1, CPS.Value do
+									local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (i * 0.2))
+									if Diagonal.Enabled then
+										if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
+											local dt = (lastpos - currentpos)
+											if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
+												currentpos = lastpos
+											end
 										end
 									end
-								end
 	
-								local block, blockpos = getPlacedBlock(currentpos)
-								if not block then
-									blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
-									if blockpos then
-										task.spawn(bedwars.placeBlock, blockpos, wool, false)
+									local block, blockpos = getPlacedBlock(currentpos)
+									if not block then
+										blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
+										if blockpos then
+											task.spawn(bedwars.placeBlock, blockpos, wool, false)
+										end
 									end
+									lastpos = currentpos
 								end
-								lastpos = currentpos
 							end
 						end
 					end
 	
-					task.wait(0.03)
+					task.wait(1 / CPS.Value)
 				until not Scaffold.Enabled
 			else
 				Label = nil
@@ -5273,6 +5273,12 @@ run(function()
 	})
 	LimitItem = Scaffold:CreateToggle({Name = 'Limit to items'})
 	Mouse = Scaffold:CreateToggle({Name = 'Require mouse down'})
+	CPS = Scaffold:CreateSlider({
+		Name = 'CPS',
+		Min = 1,
+		Max = 13,
+		Default = 6
+	})
 	Count = Scaffold:CreateToggle({
 		Name = 'Block Count',
 		Function = function(callback)
