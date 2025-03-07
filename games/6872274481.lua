@@ -5153,7 +5153,7 @@ run(function()
             local wool, amount = getScaffoldBlock()
             if wool then
                 local root = entitylib.character.RootPart
-                local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5, 0))
+                local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0))
                 local block, blockpos = getPlacedBlock(currentpos)
                 if not block then
                     blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
@@ -5176,17 +5176,15 @@ run(function()
                 -- Start Tower logic only if Tower is enabled
                 if Tower.Enabled then
                     TowerThread = task.spawn(function()
-                        local lastJumpTime = 0
                         while Scaffold.Enabled and Tower.Enabled do
                             if inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
                                 -- Use BlockCPS from AutoClicker
                                 local delay = 1 / BlockCPS.GetRandomValue()
-                                if (tick() - lastJumpTime) >= delay then
-                                    placeBlockUnderneath()
-                                    lastJumpTime = tick()
-                                end
+                                placeBlockUnderneath()
+                                task.wait(delay)
+                            else
+                                task.wait() -- Wait if Space is not held
                             end
-                            task.wait()
                         end
                     end)
                 end
@@ -5209,7 +5207,7 @@ run(function()
                         if wool then
                             local root = entitylib.character.RootPart
                             for i = Expand.Value, 1, -1 do
-                                local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5, 0) + entitylib.character.Humanoid.MoveDirection * (i * 3))
+                                local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (i * 3))
                                 if Diagonal.Enabled then
                                     if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
                                         local dt = (lastpos - currentpos)
@@ -5257,7 +5255,25 @@ run(function()
     Count = Scaffold:CreateToggle({
         Name = 'Block Count',
         Function = function(callback)
-            -- Label logic (unchanged)
+            if callback then
+                label = Instance.new('TextLabel')
+                label.Size = UDim2.fromOffset(100, 20)
+                label.Position = UDim2.new(0.5, 6, 0.5, 60)
+                label.BackgroundTransparency = 1
+                label.AnchorPoint = Vector2.new(0.5, 0)
+                label.Text = '0'
+                label.TextColor3 = Color3.new(0, 1, 0)
+                label.TextSize = 18
+                label.RichText = true
+                label.Font = Enum.Font.Arial
+                label.Visible = Scaffold.Enabled
+                label.Parent = vape.gui
+            else
+                if label then
+                    label:Destroy()
+                    label = nil
+                end
+            end
         end
     })
 end)                                                                                                                                                                                                                                                                                                                                                 
