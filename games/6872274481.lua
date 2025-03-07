@@ -5146,36 +5146,6 @@ run(function()
         end
     end
 
-    local function nearCorner(poscheck, pos)
-        local startpos = poscheck - Vector3.new(3, 3, 3)
-        local endpos = poscheck + Vector3.new(3, 3, 3)
-        local check = poscheck + (pos - poscheck).Unit * 100
-        return Vector3.new(math.clamp(check.X, startpos.X, endpos.X), math.clamp(check.Y, startpos.Y, endpos.Y), math.clamp(check.Z, startpos.Z, endpos.Z))
-    end
-
-    local function blockProximity(pos)
-        local mag, returned = 60
-        local tab = getBlocksInPoints(bedwars.BlockController:getBlockPosition(pos - Vector3.new(21, 21, 21)), bedwars.BlockController:getBlockPosition(pos + Vector3.new(21, 21, 21)))
-        for _, v in tab do
-            local blockpos = nearCorner(v, pos)
-            local newmag = (pos - blockpos).Magnitude
-            if newmag < mag then
-                mag, returned = newmag, blockpos
-            end
-        end
-        table.clear(tab)
-        return returned
-    end
-
-    local function checkAdjacent(pos)
-        for _, v in adjacent do
-            if getPlacedBlock(pos + v) then
-                return true
-            end
-        end
-        return false
-    end
-
     local function getScaffoldBlock()
         if store.hand.toolType == 'block' then
             return store.hand.tool.Name, store.hand.amount
@@ -5226,6 +5196,7 @@ run(function()
                                 root.Velocity = Vector3.new(root.Velocity.X, TowerVelocity.Value, root.Velocity.Z)
                             end
 
+                            -- Rapid block placement loop
                             for i = Expand.Value, 1, -1 do
                                 local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (i * 3))
                                 if Diagonal.Enabled then
@@ -5237,21 +5208,13 @@ run(function()
                                     end
                                 end
 
-                                local block, blockpos = getPlacedBlock(currentpos)
-                                if not block then
-                                    blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
-                                    if blockpos then
-                                        -- Rapid block placement (Autoclicker-inspired logic)
-                                        task.spawn(bedwars.placeBlock, blockpos, wool, false)
-                                        task.wait(Speed.Value / 1000) -- Adjust delay for faster placement
-                                    end
-                                end
-                                lastpos = currentpos
+                                -- Place block without unnecessary checks
+                                task.spawn(bedwars.placeBlock, currentpos, wool, false)
                             end
                         end
                     end
 
-                    -- Use the Speed slider value directly for the delay
+                    -- Minimal delay for maximum speed
                     task.wait(Speed.Value / 1000) -- Convert slider value to a delay (e.g., 0.1 = 0.0001 seconds, 10 = 0.01 seconds)
                 until not Scaffold.Enabled
             else
@@ -5288,9 +5251,9 @@ run(function()
 
     Speed = Scaffold:CreateSlider({
         Name = 'Speed',
-        Min = 0.1,  -- Minimum delay (extremely fast)
-        Max = 10,   -- Maximum delay (slower)
-        Default = 1, -- Default delay (1 = 0.001 seconds)
+        Min = 0.01,  -- Minimum delay (extremely fast)
+        Max = 10,     -- Maximum delay (slower)
+        Default = 0.1, -- Default delay (0.1 = 0.0001 seconds)
         Function = function(value)
             -- Optional: Add functionality to update the speed dynamically
         end
