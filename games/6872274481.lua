@@ -5222,7 +5222,7 @@ run(function()
 							local root = entitylib.character.RootPart
 							if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
 								root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
-								for i = 1, CPS.Value do
+								for i = 1, CPS:GetRandomValue() do
 									local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (i * 0.2))
 									if Diagonal.Enabled then
 										if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
@@ -5246,7 +5246,7 @@ run(function()
 						end
 					end
 	
-					task.wait(1 / CPS.Value)
+					task.wait(1 / CPS:GetRandomValue())
 				until not Scaffold.Enabled
 			else
 				Label = nil
@@ -5263,6 +5263,13 @@ run(function()
 		Name = 'Tower',
 		Default = true
 	})
+	CPS = Scaffold:CreateTwoSlider({
+		Name = 'CPS',
+		Min = 1,
+		Max = 13,
+		DefaultMin = 6,
+		DefaultMax = 13
+	})
 	Downwards = Scaffold:CreateToggle({
 		Name = 'Downwards',
 		Default = true
@@ -5273,12 +5280,6 @@ run(function()
 	})
 	LimitItem = Scaffold:CreateToggle({Name = 'Limit to items'})
 	Mouse = Scaffold:CreateToggle({Name = 'Require mouse down'})
-	CPS = Scaffold:CreateSlider({
-		Name = 'CPS',
-		Min = 1,
-		Max = 13,
-		Default = 6
-	})
 	Count = Scaffold:CreateToggle({
 		Name = 'Block Count',
 		Function = function(callback)
