@@ -5132,6 +5132,7 @@ run(function()
     local LimitItem
     local Mouse
     local Speed
+    local TowerVelocity -- New variable for tower velocity
     local adjacent, lastpos, label = {}, Vector3.zero
 
     for x = -3, 3, 3 do
@@ -5221,7 +5222,8 @@ run(function()
                         if wool then
                             local root = entitylib.character.RootPart
                             if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
-                                root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                                -- Increase vertical velocity for faster and higher ascent
+                                root.Velocity = Vector3.new(root.Velocity.X, TowerVelocity.Value, root.Velocity.Z)
                             end
 
                             for i = Expand.Value, 1, -1 do
@@ -5265,7 +5267,16 @@ run(function()
 
     Tower = Scaffold:CreateToggle({
         Name = 'Tower',
-        Default = true
+        Default = true,
+        Function = function(callback)
+            if callback then
+                -- Enable tower mode with increased velocity
+                TowerVelocity.Value = 60 -- Default velocity (adjust as needed)
+            else
+                -- Disable tower mode
+                TowerVelocity.Value = 0
+            end
+        end
     })
 
     Downwards = Scaffold:CreateToggle({
@@ -5289,6 +5300,16 @@ run(function()
         Default = 1, -- Default delay (1 = 0.001 seconds)
         Function = function(value)
             -- Optional: Add functionality to update the speed dynamically
+        end
+    })
+
+    TowerVelocity = Scaffold:CreateSlider({
+        Name = 'Tower Velocity',
+        Min = 30,  -- Minimum velocity (default speed)
+        Max = 100, -- Maximum velocity (very fast)
+        Default = 60, -- Default velocity (adjust as needed)
+        Function = function(value)
+            -- Update the tower velocity dynamically
         end
     })
 
