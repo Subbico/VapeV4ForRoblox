@@ -5220,12 +5220,14 @@ run(function()
 
                         if wool then
                             local root = entitylib.character.RootPart
+                            local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0))
+
+                            -- Tower Logic (only if Tower is enabled)
                             if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
                                 root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
 
                                 -- Use TowerCPS to control block placement speed
                                 local delay = 1 / TowerCPS.Value
-                                local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0))
                                 local block, blockpos = getPlacedBlock(currentpos)
                                 if not block then
                                     blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
@@ -5235,9 +5237,9 @@ run(function()
                                 end
                                 task.wait(delay) -- Wait based on CPS
                             else
-                                -- Normal Scaffold logic (non-Tower)
+                                -- Normal Scaffold Logic (non-Tower)
                                 for i = Expand.Value, 1, -1 do
-                                    local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (i * 3))
+                                    currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (i * 3))
                                     if Diagonal.Enabled then
                                         if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
                                             local dt = (lastpos - currentpos)
@@ -5329,7 +5331,8 @@ run(function()
             end
         end
     })
-end)	
+end)                                                                                                                                                                                                                                                                                                                                                  
+																																																																													
 run(function()
 	local ShopTierBypass
 	local tiered, nexttier = {}, {}
