@@ -5247,8 +5247,8 @@ run(function()
                         end
                     end
 
-                    -- Use the Speed slider value to control the delay
-                    task.wait(Speed.Value / 100) -- Convert slider value to a delay (e.g., 1 = 0.01 seconds, 30 = 0.3 seconds)
+                    -- Use the Speed slider value directly for the delay
+                    task.wait(Speed.Value / 1000) -- Convert slider value to a delay (e.g., 0.1 = 0.0001 seconds, 10 = 0.01 seconds)
                 until not Scaffold.Enabled
             else
                 Label = nil
@@ -5284,9 +5284,9 @@ run(function()
 
     Speed = Scaffold:CreateSlider({
         Name = 'Speed',
-        Min = 1,  -- Minimum delay (fastest speed)
-        Max = 30, -- Maximum delay (slowest speed)
-        Default = 3, -- Default delay (in frames or milliseconds)
+        Min = 0.1,  -- Minimum delay (extremely fast)
+        Max = 10,   -- Maximum delay (slower)
+        Default = 1, -- Default delay (1 = 0.001 seconds)
         Function = function(value)
             -- Optional: Add functionality to update the speed dynamically
         end
