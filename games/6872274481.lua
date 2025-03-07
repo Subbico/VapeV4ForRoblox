@@ -5132,7 +5132,7 @@ run(function()
     local LimitItem
     local Mouse
     local Speed
-    local TowerVelocity -- New variable for tower velocity
+    local TowerVelocity
     local adjacent, lastpos, label = {}, Vector3.zero
 
     for x = -3, 3, 3 do
@@ -5241,7 +5241,9 @@ run(function()
                                 if not block then
                                     blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
                                     if blockpos then
+                                        -- Rapid block placement (Autoclicker-inspired logic)
                                         task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                        task.wait(Speed.Value / 1000) -- Adjust delay for faster placement
                                     end
                                 end
                                 lastpos = currentpos
