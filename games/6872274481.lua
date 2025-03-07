@@ -5222,7 +5222,7 @@ run(function()
                         if wool then
                             local root = entitylib.character.RootPart
                             if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
-                                -- Increase vertical velocity for faster and higher ascent
+                                -- Apply increased vertical velocity for faster and higher ascent
                                 root.Velocity = Vector3.new(root.Velocity.X, TowerVelocity.Value, root.Velocity.Z)
                             end
 
@@ -5267,16 +5267,7 @@ run(function()
 
     Tower = Scaffold:CreateToggle({
         Name = 'Tower',
-        Default = true,
-        Function = function(callback)
-            if callback then
-                -- Enable tower mode with increased velocity
-                TowerVelocity.Value = 60 -- Default velocity (adjust as needed)
-            else
-                -- Disable tower mode
-                TowerVelocity.Value = 0
-            end
-        end
+        Default = true
     })
 
     Downwards = Scaffold:CreateToggle({
