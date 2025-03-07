@@ -5237,7 +5237,7 @@ run(function()
 
                 -- Wait based on CPS
                 task.wait(1 / math.random(towerCPS.Min, towerCPS.Max))
-            until not Tower.Enabled
+            until not inputService:IsKeyDown(Enum.KeyCode.Space) or not Tower.Enabled
         end)
     end
 
@@ -5250,23 +5250,19 @@ run(function()
             end
 
             if callback then
-                -- Connect to secondary jump button (mobile)
-                if inputService.TouchEnabled then
-                    pcall(function()
-                        Scaffold:Clean(lplr.PlayerGui.MobileUI['2'].MouseButton1Down:Connect(function()
-                            if Tower.Enabled then
-                                placeBlocksAtCPS()
-                            end
-                        end))
+                -- Connect to jump button (spacebar)
+                Scaffold:Clean(inputService.InputBegan:Connect(function(input)
+                    if input.KeyCode == Enum.KeyCode.Space and Tower.Enabled then
+                        placeBlocksAtCPS()
+                    end
+                end))
 
-                        Scaffold:Clean(lplr.PlayerGui.MobileUI['2'].MouseButton1Up:Connect(function()
-                            if towerThread then
-                                task.cancel(towerThread)
-                                towerThread = nil
-                            end
-                        end))
-                    end)
-                end
+                Scaffold:Clean(inputService.InputEnded:Connect(function(input)
+                    if input.KeyCode == Enum.KeyCode.Space and towerThread then
+                        task.cancel(towerThread)
+                        towerThread = nil
+                    end
+                end))
             else
                 if towerThread then
                     task.cancel(towerThread)
@@ -5338,7 +5334,7 @@ run(function()
             end
         end
     })
-end)                                                                                                                                                                                                                                                                                                                                                 
+end)                                                                                                                                                                                                                                                                                                                                                
 																																																																													
 run(function()
 	local ShopTierBypass
