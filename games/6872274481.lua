@@ -5148,8 +5148,8 @@ end
 local function blockProximity(pos)
     local mag = 60
     local returned
-    local startPos = bedwars.BlockController:getBlockPosition(pos - Vector3.new(21, 21, 21))
-    local endPos = bedwars.BlockController:getBlockPosition(pos + Vector3.new(21, 21, 21))
+    local startPos = bedwars.BlockController:getBlockPosition(pos - Vector3.new(15, 15, 15))  
+    local endPos = bedwars.BlockController:getBlockPosition(pos + Vector3.new(15, 15, 15))
     local blocks = getBlocksInPoints(startPos, endPos)
     
     for i = 1, #blocks do
@@ -5201,6 +5201,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
         if callback then
             local lastUpdate = tick()
             local towerThread
+            local lastTowerPlace = 0
             
             -- Handle tower building with CPS
             local function startTowerBuild()
@@ -5213,20 +5214,19 @@ Scaffold = vape.Categories.Utility:CreateModule({
                             
                             -- Place block with CPS timing
                             if entitylib.isAlive then
-                                local wool, amount = getScaffoldBlock()
-                                if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                    local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
-                                    local block, blockpos = getPlacedBlock(roundPos(pos))
-                                    if not block then
-                                        blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(pos)
-                                        if blockpos then
-                                            task.spawn(bedwars.placeBlock, blockpos, wool, false)
-                                        end
+                                local currentTime = tick()
+                                if currentTime - lastTowerPlace >= (1 / TowerCPS.GetRandomValue()) then
+                                    local wool, amount = getScaffoldBlock()
+                                    if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                        local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
+                                        local blockpos = bedwars.BlockController:getBlockPosition(pos)
+                                        task.spawn(bedwars.placeBlock, blockpos * 3, wool, false)
+                                        lastTowerPlace = currentTime
                                     end
                                 end
                             end
                         end
-                        task.wait(1 / TowerCPS.GetRandomValue())
+                        task.wait(0.01)  
                     end
                     towerThread = nil
                 end)
@@ -5305,20 +5305,14 @@ Scaffold = vape.Categories.Utility:CreateModule({
 
                             local block, blockpos = getPlacedBlock(currentpos)
                             if not block then
-                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
-                                if blockpos then
-                                    task.spawn(bedwars.placeBlock, blockpos, wool, false)
-                                end
+                                task.spawn(bedwars.placeBlock, blockpos * 3, wool, false)
                             end
                             lastpos = currentpos
                         end
                     end
                 end
 
-                local currentTime = tick()
-                local deltaTime = currentTime - lastUpdate
-                lastUpdate = currentTime
-                task.wait(math.max(0.01, math.min(0.03, deltaTime * 0.5)))
+                task.wait(0.01)  
             until not Scaffold.Enabled
         else
             Label = nil
@@ -5382,7 +5376,6 @@ TowerCPS = Scaffold:CreateTwoSlider({
     DefaultMax = 12,
     Darker = true
 })
-
                                                                                                                                                                                                                                                                                                                                                 
 																																																																													
 run(function()
