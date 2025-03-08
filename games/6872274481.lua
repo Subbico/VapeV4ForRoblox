@@ -3258,6 +3258,21 @@ run(function()
 		return tool, projectile
 	end
 
+	-- Function to check if the player has the specified tool and projectile
+	local function hasToolAndProjectile(toolName, projectileName)
+		local hasTool = false
+		local hasProjectile = false
+		for _, item in store.inventory.inventory.items do
+			if item.itemType == toolName then
+				hasTool = true
+			end
+			if item.itemType == projectileName then
+				hasProjectile = true
+			end
+		end
+		return hasTool and hasProjectile
+	end
+
 	-- Function to get the tool and projectile from the player's inventory
 	local function getToolAndProjectile()
 		local items = {}
@@ -3288,7 +3303,17 @@ run(function()
 		Function = function(callback)
 			if callback then
 				repeat
-					if (workspace:GetServerTimeNow() - bedwars.SwordController.lastAttack) > 0.5 then
+					-- Check if the player has the specified tool and projectile
+					local canShoot = false
+					for _, entry in ToolProjectileList.ListEnabled do
+						local tool, projectile = parseToolProjectile(entry)
+						if hasToolAndProjectile(tool, projectile) then
+							canShoot = true
+							break
+						end
+					end
+
+					if canShoot and (workspace:GetServerTimeNow() - bedwars.SwordController.lastAttack) > 0.5 then
 						local ent = entitylib.EntityPosition({
 							Part = 'RootPart',
 							Range = Range.Value,
@@ -3339,7 +3364,7 @@ run(function()
 				until not ProjectileAura.Enabled
 			end
 		end,
-		Tooltip = 'Shoots people around you'
+		Tooltip = 'Automatically shoots projectiles at targets when you have the specified tool and projectile.'
 	})
 
 	Targets = ProjectileAura:CreateTargets({
