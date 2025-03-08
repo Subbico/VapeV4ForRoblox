@@ -1267,7 +1267,9 @@ run(function()
     local CPS
     local BlockCPS = {}
     local Thread
+    local autoBridgeThread = nil
 
+    -- Function to auto-click (sword)
     local function AutoClick()
         if Thread then
             task.cancel(Thread)
@@ -1294,11 +1296,47 @@ run(function()
         end)
     end
 
+    -- Start auto-placing blocks for auto bridge
+    local function StartAutoBridge()
+        if autoBridgeThread then
+            task.cancel(autoBridgeThread)  -- Cancel any existing thread if it's already running
+        end
+
+        -- Start placing blocks at a consistent rate when the button is held down
+        autoBridgeThread = task.delay(1 / 7, function()
+            repeat
+                if not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                    local blockPlacer = bedwars.BlockPlacementController.blockPlacer
+                    if store.hand.toolType == 'block' and blockPlacer then
+                        if (workspace:GetServerTimeNow() - bedwars.BlockCpsController.lastPlaceTimestamp) >= ((1 / 12) * 0.5) then
+                            -- Get position in front of the player
+                            local mouseinfo = blockPlacer.clientManager:getBlockSelector():getMouseInfo(0)
+                            if mouseinfo and mouseinfo.placementPosition == mouseinfo.placementPosition then
+                                -- Place block at the position
+                                task.spawn(blockPlacer.placeBlock, blockPlacer, mouseinfo.placementPosition)
+                            end
+                        end
+                    end
+                end
+                task.wait(1 / BlockCPS.GetRandomValue())  -- Adjust CPS rate for block placing
+            until not AutoClicker.Enabled  -- Stop when autoclicker is disabled
+        end)
+    end
+
+    -- Stop the auto bridge action
+    local function StopAutoBridge()
+        if autoBridgeThread then
+            task.cancel(autoBridgeThread)
+            autoBridgeThread = nil
+        end
+    end
+
+    -- AutoClicker module creation
     AutoClicker = vape.Categories.Combat:CreateModule({
         Name = 'AutoClicker',
         Function = function(callback)
             if callback then
-                -- Listen for mouse input (desktop)
+                -- Sword autoclicker
                 AutoClicker:Clean(inputService.InputBegan:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 then
                         AutoClick()
@@ -1312,10 +1350,9 @@ run(function()
                     end
                 end))
 
-                -- Listen for touch input (mobile)
+                -- Mobile support for sword autoclicker
                 if inputService.TouchEnabled then
                     pcall(function()
-                        -- Attack button (existing logic)
                         AutoClicker:Clean(lplr.PlayerGui.MobileUI['2'].MouseButton1Down:Connect(AutoClick))
                         AutoClicker:Clean(lplr.PlayerGui.MobileUI['2'].MouseButton1Up:Connect(function()
                             if Thread then
@@ -1323,27 +1360,31 @@ run(function()
                                 Thread = nil
                             end
                         end))
-
-                        -- Auto-bridge button (new logic)
-                        AutoClicker:Clean(lplr.PlayerGui.MobileUI['3'].MouseButton1Down:Connect(AutoClick))
-                        AutoClicker:Clean(lplr.PlayerGui.MobileUI['3'].MouseButton1Up:Connect(function()
-                            if Thread then
-                                task.cancel(Thread)
-                                Thread = nil
-                            end
-                        end))
                     end)
                 end
+
+                -- Mobile support for auto bridge
+                AutoClicker:Clean(lplr.PlayerGui.MobileUI['5'].MouseButton1Down:Connect(function()
+                    StartAutoBridge()  -- Start auto-placing blocks when the button is pressed
+                end))
+
+                AutoClicker:Clean(lplr.PlayerGui.MobileUI['5'].MouseButton1Up:Connect(function()
+                    StopAutoBridge()  -- Stop auto-placing blocks when the button is released
+                end))
+
             else
                 if Thread then
                     task.cancel(Thread)
                     Thread = nil
                 end
+                -- Ensure auto-bridge thread is canceled when autoclicker is disabled
+                StopAutoBridge()
             end
         end,
-        Tooltip = 'Hold attack or auto-bridge button to automatically click'
+        Tooltip = 'Hold attack button to automatically click'
     })
 
+    -- CPS settings for sword
     CPS = AutoClicker:CreateTwoSlider({
         Name = 'CPS',
         Min = 1,
@@ -1352,6 +1393,7 @@ run(function()
         DefaultMax = 7
     })
 
+    -- Block CPS settings
     AutoClicker:CreateToggle({
         Name = 'Place Blocks',
         Default = true,
@@ -1370,53 +1412,9 @@ run(function()
         DefaultMax = 12,
         Darker = true
     })
+
 end)
-	
-run(function()
-	local old
-	
-	vape.Categories.Combat:CreateModule({
-		Name = 'NoClickDelay',
-		Function = function(callback)
-			if callback then
-				old = bedwars.SwordController.isClickingTooFast
-				bedwars.SwordController.isClickingTooFast = function(self)
-					self.lastSwing = tick()
-					return false
-				end
-			else
-				bedwars.SwordController.isClickingTooFast = old
-			end
-		end,
-		Tooltip = 'Remove the CPS cap'
-	})
-end)
-	
-run(function()
-	local Value
-	
-	Reach = vape.Categories.Combat:CreateModule({
-		Name = 'Reach',
-		Function = function(callback)
-			bedwars.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE = callback and Value.Value + 2 or 14.4
-		end,
-		Tooltip = 'Extends attack reach'
-	})
-	Value = Reach:CreateSlider({
-		Name = 'Range',
-		Min = 0,
-		Max = 18,
-		Default = 18,
-		Function = function(val)
-			if Reach.Enabled then
-				bedwars.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE = val + 2
-			end
-		end,
-		Suffix = function(val)
-			return val == 1 and 'stud' or 'studs'
-		end
-	})
-end)
+
 	
 run(function()
 	local Sprint
