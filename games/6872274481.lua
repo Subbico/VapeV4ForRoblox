@@ -5188,7 +5188,7 @@ run(function()
                         end
                     end
     
-                    task.wait(1 / 13) -- Respects the 13 CPS cap
+                    task.wait(1 / SpeedSlider.Value) -- Adjust speed based on CPS slider
                 until not Scaffold.Enabled
             else
                 Label = nil
@@ -5203,11 +5203,12 @@ run(function()
         Max = 6
     })
     
-    SpeedSlider = Scaffold:CreateSlider({ -- New slider for speed
-        Name = 'Speed',
+    SpeedSlider = Scaffold:CreateSlider({ -- Updated slider for CPS
+        Name = 'Speed (CPS)',
         Min = 1, 
-        Max = 100, -- Increased range for finer control
-        Default = 50 -- Middle speed
+        Max = 13, -- Maximum CPS in BedWars
+        Default = 13, -- Default to maximum speed
+        Tooltip = 'Controls how many blocks are placed per second (1-13).'
     })
     
     Tower = Scaffold:CreateToggle({
