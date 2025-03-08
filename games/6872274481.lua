@@ -5214,11 +5214,13 @@ Scaffold = vape.Categories.Utility:CreateModule({
                             if entitylib.isAlive then
                                 local root = entitylib.character.RootPart
                                 if root then
-                                    -- Apply upward velocity
-                                    root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
-                                    
-                                    -- Get block and place with proper checks
                                     local wool = getScaffoldBlock()
+                                    -- Only apply velocity if we have blocks or LimitItem is off
+                                    if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                        root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                                    end
+                                    
+                                    -- Place blocks if we have them
                                     if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
                                         local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
                                         local roundedPos = roundPos(pos)
