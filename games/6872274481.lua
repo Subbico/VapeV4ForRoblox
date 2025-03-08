@@ -5240,8 +5240,8 @@ run(function()
 
     BlockCPS = Scaffold:CreateSlider({
         Name = 'Block CPS',
-        Min = 1,
-        Max = 20,  -- Max CPS for block placement
+        Min = 1,  -- Minimum CPS
+        Max = 12, -- Maximum CPS
         Default = 12
     })
 
