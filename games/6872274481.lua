@@ -5183,12 +5183,22 @@ run(function()
                             -- Fast block placement (respects 13 CPS cap)
                             local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * 3)
                             if not getPlacedBlock(currentpos) then
-                                task.spawn(bedwars.placeBlock, currentpos, wool, false)
+                                -- Check if the block position is valid before placing
+                                local isValid = true
+                                for _, v in adjacent do
+                                    if getPlacedBlock(currentpos + v) then
+                                        isValid = false
+                                        break
+                                    end
+                                end
+                                if isValid then
+                                    task.spawn(bedwars.placeBlock, currentpos, wool, false)
+                                end
                             end
                         end
                     end
     
-                    task.wait(1 / SpeedSlider.Value) -- Adjust speed based on CPS slider
+                    task.wait(1 / 13) -- Respects the 13 CPS cap
                 until not Scaffold.Enabled
             else
                 Label = nil
