@@ -5206,7 +5206,7 @@ run(function()
 
                                 for i = 1, 3 do  -- Place multiple blocks per iteration
                                     for j = Expand.Value, 1, -1 do
-                                        local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (j * 3))
+                                        local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0) + (entitylib.character.Humanoid.MoveDirection * (j * 3)))
                                         if Diagonal.Enabled then
                                             if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
                                                 local dt = (lastpos - currentpos)
