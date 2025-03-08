@@ -1263,209 +1263,98 @@ run(function()
 end)
 	
 run(function()
-    local AutoClicker
-    local CPS
-    local BlockCPS = {}
-    local Thread
-    local autoBridgeThread = nil
-
-    -- Function to auto-click (sword)
-    local function AutoClick()
-        if Thread then
-            task.cancel(Thread)
-        end
-
-        Thread = task.delay(1 / 7, function()
-            repeat
-                if not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                    local blockPlacer = bedwars.BlockPlacementController.blockPlacer
-                    if store.hand.toolType == 'block' and blockPlacer then
-                        if (workspace:GetServerTimeNow() - bedwars.BlockCpsController.lastPlaceTimestamp) >= ((1 / 12) * 0.5) then
-                            local mouseinfo = blockPlacer.clientManager:getBlockSelector():getMouseInfo(0)
-                            if mouseinfo and mouseinfo.placementPosition == mouseinfo.placementPosition then
-                                task.spawn(blockPlacer.placeBlock, blockPlacer, mouseinfo.placementPosition)
-                            end
-                        end
-                    elseif store.hand.toolType == 'sword' and bedwars.DaoController.chargingMaid == nil then
-                        bedwars.SwordController:swingSwordAtMouse()
-                    end
-                end
-
-                task.wait(1 / (store.hand.toolType == 'block' and BlockCPS or CPS).GetRandomValue())
-            until not AutoClicker.Enabled
-        end)
-    end
-
-    -- Start auto-placing blocks for auto bridge (same as mobile auto bridge code)
-    local function StartAutoBridge()
-        if autoBridgeThread then
-            task.cancel(autoBridgeThread)  -- Cancel any existing thread if it's already running
-        end
-
-        -- Start placing blocks at a consistent rate when the button is held down
-        autoBridgeThread = task.delay(1 / 7, function()
-            repeat
-                if not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                    local blockPlacer = bedwars.BlockPlacementController.blockPlacer
-                    if store.hand.toolType == 'block' and blockPlacer then
-                        if (workspace:GetServerTimeNow() - bedwars.BlockCpsController.lastPlaceTimestamp) >= ((1 / 12) * 0.5) then
-                            -- Get position in front of the player
-                            local mouseinfo = blockPlacer.clientManager:getBlockSelector():getMouseInfo(0)
-                            if mouseinfo and mouseinfo.placementPosition == mouseinfo.placementPosition then
-                                -- Place block at the position (same as the mobile auto bridge logic)
-                                task.spawn(blockPlacer.placeBlock, blockPlacer, mouseinfo.placementPosition)
-                            end
-                        end
-                    end
-                end
-                task.wait(1 / BlockCPS.GetRandomValue())  -- Adjust CPS rate for block placing
-            until not AutoClicker.Enabled  -- Stop when autoclicker is disabled
-        end)
-    end
-
-    -- Stop the auto bridge action
-    local function StopAutoBridge()
-        if autoBridgeThread then
-            task.cancel(autoBridgeThread)
-            autoBridgeThread = nil
-        end
-    end
-
-    -- AutoClicker module creation
-    AutoClicker = vape.Categories.Combat:CreateModule({
-        Name = 'AutoClicker',
-        Function = function(callback)
-            if callback then
-                -- Sword autoclicker
-                AutoClicker:Clean(inputService.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        AutoClick()
-                    end
-                end))
-
-                AutoClicker:Clean(inputService.InputEnded:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 and Thread then
-                        task.cancel(Thread)
-                        Thread = nil
-                    end
-                end))
-
-                -- Mobile support for sword autoclicker
-                if inputService.TouchEnabled then
-                    pcall(function()
-                        AutoClicker:Clean(lplr.PlayerGui.MobileUI['2'].MouseButton1Down:Connect(AutoClick))
-                        AutoClicker:Clean(lplr.PlayerGui.MobileUI['2'].MouseButton1Up:Connect(function()
-                            if Thread then
-                                task.cancel(Thread)
-                                Thread = nil
-                            end
-                        end))
-                    end)
-                end
-
-                -- Mobile support for auto bridge (integrated with the building code)
-                AutoClicker:Clean(lplr.PlayerGui.MobileUI['5'].MouseButton1Down:Connect(function()
-                    StartAutoBridge()  -- Start auto-placing blocks for the bridge
-                end))
-
-                AutoClicker:Clean(lplr.PlayerGui.MobileUI['5'].MouseButton1Up:Connect(function()
-                    StopAutoBridge()  -- Stop auto-placing blocks when the button is released
-                end))
-
-            else
-                if Thread then
-                    task.cancel(Thread)
-                    Thread = nil
-                end
-                -- Ensure auto-bridge thread is canceled when autoclicker is disabled
-                StopAutoBridge()
-            end
-        end,
-        Tooltip = 'Hold attack button to automatically click'
-    })
-
-    -- CPS settings for sword
-    CPS = AutoClicker:CreateTwoSlider({
-        Name = 'CPS',
-        Min = 1,
-        Max = 9,
-        DefaultMin = 7,
-        DefaultMax = 7
-    })
-
-    -- Block CPS settings for auto bridge
-    AutoClicker:CreateToggle({
-        Name = 'Place Blocks',
-        Default = true,
-        Function = function(callback)
-            if BlockCPS.Object then
-                BlockCPS.Object.Visible = callback
-            end
-        end
-    })
-
-    BlockCPS = AutoClicker:CreateTwoSlider({
-        Name = 'Block CPS',
-        Min = 1,
-        Max = 12,
-        DefaultMin = 12,
-        DefaultMax = 12,
-        Darker = true
-    })
-
-end)
-
-
-                -- Mobile support for auto bridge
-                AutoClicker:Clean(lplr.PlayerGui.MobileUI['5'].MouseButton1Down:Connect(function()
-                    StartAutoBridge()  -- Start auto-placing blocks when the button is pressed
-                end))
-
-                AutoClicker:Clean(lplr.PlayerGui.MobileUI['5'].MouseButton1Up:Connect(function()
-                    StopAutoBridge()  -- Stop auto-placing blocks when the button is released
-                end))
-
-            else
-                if Thread then
-                    task.cancel(Thread)
-                    Thread = nil
-                end
-                -- Ensure auto-bridge thread is canceled when autoclicker is disabled
-                StopAutoBridge()
-            end
-        end,
-        Tooltip = 'Hold attack button to automatically click'
-    })
-
-    -- CPS settings for sword
-    CPS = AutoClicker:CreateTwoSlider({
-        Name = 'CPS',
-        Min = 1,
-        Max = 9,
-        DefaultMin = 7,
-        DefaultMax = 7
-    })
-
-    -- Block CPS settings
-    AutoClicker:CreateToggle({
-        Name = 'Place Blocks',
-        Default = true,
-        Function = function(callback)
-            if BlockCPS.Object then
-                BlockCPS.Object.Visible = callback
-            end
-        end
-    })
-
-    BlockCPS = AutoClicker:CreateTwoSlider({
-        Name = 'Block CPS',
-        Min = 1,
-        Max = 12,
-        DefaultMin = 12,
-        DefaultMax = 12,
-        Darker = true
-    })
-
+	local AutoClicker
+	local CPS
+	local BlockCPS = {}
+	local Thread
+	
+	local function AutoClick()
+		if Thread then
+			task.cancel(Thread)
+		end
+	
+		Thread = task.delay(1 / 7, function()
+			repeat
+				if not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+					local blockPlacer = bedwars.BlockPlacementController.blockPlacer
+					if store.hand.toolType == 'block' and blockPlacer then
+						if (workspace:GetServerTimeNow() - bedwars.BlockCpsController.lastPlaceTimestamp) >= ((1 / 12) * 0.5) then
+							local mouseinfo = blockPlacer.clientManager:getBlockSelector():getMouseInfo(0)
+							if mouseinfo and mouseinfo.placementPosition == mouseinfo.placementPosition then
+								task.spawn(blockPlacer.placeBlock, blockPlacer, mouseinfo.placementPosition)
+							end
+						end
+					elseif store.hand.toolType == 'sword' and bedwars.DaoController.chargingMaid == nil then
+						bedwars.SwordController:swingSwordAtMouse()
+					end
+				end
+	
+				task.wait(1 / (store.hand.toolType == 'block' and BlockCPS or CPS).GetRandomValue())
+			until not AutoClicker.Enabled
+		end)
+	end
+	
+	AutoClicker = vape.Categories.Combat:CreateModule({
+		Name = 'AutoClicker',
+		Function = function(callback)
+			if callback then
+				AutoClicker:Clean(inputService.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+						AutoClick()
+					end
+				end))
+	
+				AutoClicker:Clean(inputService.InputEnded:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 and Thread then
+						task.cancel(Thread)
+						Thread = nil
+					end
+				end))
+	
+				if inputService.TouchEnabled then
+					pcall(function()
+						AutoClicker:Clean(lplr.PlayerGui.MobileUI['2'].MouseButton1Down:Connect(AutoClick))
+						AutoClicker:Clean(lplr.PlayerGui.MobileUI['2'].MouseButton1Up:Connect(function()
+							if Thread then
+								task.cancel(Thread)
+								Thread = nil
+							end
+						end))
+					end)
+				end
+			else
+				if Thread then
+					task.cancel(Thread)
+					Thread = nil
+				end
+			end
+		end,
+		Tooltip = 'Hold attack button to automatically click'
+	})
+	CPS = AutoClicker:CreateTwoSlider({
+		Name = 'CPS',
+		Min = 1,
+		Max = 9,
+		DefaultMin = 7,
+		DefaultMax = 7
+	})
+	AutoClicker:CreateToggle({
+		Name = 'Place Blocks',
+		Default = true,
+		Function = function(callback)
+			if BlockCPS.Object then
+				BlockCPS.Object.Visible = callback
+			end
+		end
+	})
+	BlockCPS = AutoClicker:CreateTwoSlider({
+		Name = 'Block CPS',
+		Min = 1,
+		Max = 12,
+		DefaultMin = 12,
+		DefaultMax = 12,
+		Darker = true
+	})
 end)
 
 	
