@@ -5203,8 +5203,13 @@ run(function()
     
                         if wool then
                             local root = entitylib.character.RootPart
+                            local humanoid = entitylib.character.Humanoid
+
+                            -- Custom Tower Logic
                             if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
-                                root.Velocity = Vector3.new(root.Velocity.X, 100, root.Velocity.Z) -- Increased jump height
+                                -- Apply a small upward force for smooth tower movement
+                                root.Velocity = Vector3.new(root.Velocity.X, 30, root.Velocity.Z) -- Adjust Y velocity for height
+                                humanoid:ChangeState(Enum.HumanoidStateType.Jumping) -- Force jump state
                             end
     
                             for i = Expand.Value, 1, -1 do
@@ -5230,7 +5235,7 @@ run(function()
                         end
                     end
     
-                    task.wait(0.0001 * SpeedSlider.Value) -- Adjusted for much faster speed
+                    task.wait(0.0001 * SpeedSlider.Value) -- Adjust speed based on slider
                 until not Scaffold.Enabled
             else
                 Label = nil
