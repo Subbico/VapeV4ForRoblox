@@ -5175,6 +5175,30 @@ run(function()
         return nil, 0
     end
 
+    local function placeBlockUnderneath()
+        if entitylib.isAlive then
+            local wool, amount = getScaffoldBlock()
+            if wool then
+                local root = entitylib.character.RootPart
+                local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0))
+                local block, blockpos = getPlacedBlock(currentpos)
+                if not block then
+                    blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
+                    if blockpos then
+                        task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                    end
+                end
+            end
+        end
+    end
+
+    local function autoPlaceBlocks()
+        while Scaffold.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or (inputService.TouchEnabled and inputService:IsMouseButtonPressed(Enum.UserInputType.Touch))) do
+            placeBlockUnderneath()
+            task.wait(1 / 12)  -- Adjust delay for block placement speed
+        end
+    end
+
     Scaffold = vape.Categories.Utility:CreateModule({
         Name = 'Scaffold',
         Function = function(callback)
@@ -5183,78 +5207,25 @@ run(function()
             end
 
             if callback then
-                repeat
-                    if entitylib.isAlive then
-                        local wool, amount = getScaffoldBlock()
-
-                        if Mouse.Enabled then
-                            if not inputService:IsMouseButtonPressed(0) then
-                                wool = nil
-                            end
-                        end
-
-                        if label then
-                            amount = amount or 0
-                            label.Text = amount..' <font color="rgb(170, 170, 170)">(Scaffold)</font>'
-                            label.TextColor3 = Color3.fromHSV((amount / 128) / 2.8, 0.86, 1)
-                        end
-
-                        if wool then
-                            local root = entitylib.character.RootPart
-                            if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
-                                root.Velocity = Vector3.new(root.Velocity.X, 60, root.Velocity.Z)  -- Increased vertical velocity
-
-                                for i = 1, 3 do  -- Place multiple blocks per iteration
-                                    for j = Expand.Value, 1, -1 do
-                                        local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0) + (entitylib.character.Humanoid.MoveDirection * (j * 3)))
-                                        if Diagonal.Enabled then
-                                            if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
-                                                local dt = (lastpos - currentpos)
-                                                if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
-                                                    currentpos = lastpos
-                                                end
-                                            end
-                                        end
-
-                                        local block, blockpos = getPlacedBlock(currentpos)
-                                        if not block then
-                                            blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
-                                            if blockpos then
-                                                task.spawn(bedwars.placeBlock, blockpos, wool, false)
-                                            end
-                                        end
-                                        lastpos = currentpos
-                                    end
-                                    task.wait(0.01)  -- Reduced delay for faster placement
-                                end
-                            else
-                                for i = Expand.Value, 1, -1 do
-                                    local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (i * 3))
-                                    if Diagonal.Enabled then
-                                        if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
-                                            local dt = (lastpos - currentpos)
-                                            if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
-                                                currentpos = lastpos
-                                            end
-                                        end
-                                    end
-
-                                    local block, blockpos = getPlacedBlock(currentpos)
-                                    if not block then
-                                        blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
-                                        if blockpos then
-                                            task.spawn(bedwars.placeBlock, blockpos, wool, false)
-                                        end
-                                    end
-                                    lastpos = currentpos
-                                end
-                            end
-                        end
+                local connection
+                connection = inputService.InputBegan:Connect(function(input)
+                    if input.KeyCode == Enum.KeyCode.Space or (inputService.TouchEnabled and input.UserInputType == Enum.UserInputType.Touch) then
+                        autoPlaceBlocks()
                     end
-                    task.wait(0.03)
+                end)
+
+                repeat
+                    task.wait()
                 until not Scaffold.Enabled
+
+                if connection then
+                    connection:Disconnect()
+                end
             else
-                Label = nil
+                if label then
+                    label:Destroy()
+                    label = nil
+                end
             end
         end,
         Tooltip = 'Helps you make bridges/scaffold walk.'
@@ -5263,7 +5234,7 @@ run(function()
     Expand = Scaffold:CreateSlider({
         Name = 'Expand',
         Min = 1,
-        Max = 13  -- Increased max value to 13
+        Max = 13
     })
 
     Tower = Scaffold:CreateToggle({
