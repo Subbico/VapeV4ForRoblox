@@ -5114,6 +5114,7 @@ run(function()
     local Diagonal
     local LimitItem
     local Mouse
+    local BlockCPS
     local adjacent, lastpos, label = {}, Vector3.zero
 
     for x = -3, 3, 3 do
@@ -5195,7 +5196,7 @@ run(function()
     local function autoPlaceBlocks()
         while Scaffold.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or (inputService.TouchEnabled and inputService:IsMouseButtonPressed(Enum.UserInputType.Touch))) do
             placeBlockUnderneath()
-            task.wait(1 / 12)  -- Adjust delay for block placement speed
+            task.wait(1 / BlockCPS.Value)  -- Use BlockCPS slider value for delay
         end
     end
 
@@ -5233,8 +5234,15 @@ run(function()
 
     Expand = Scaffold:CreateSlider({
         Name = 'Expand',
+        Min = 1,  -- Minimum value
+        Max = 6   -- Maximum value
+    })
+
+    BlockCPS = Scaffold:CreateSlider({
+        Name = 'Block CPS',
         Min = 1,
-        Max = 13
+        Max = 20,  -- Max CPS for block placement
+        Default = 12
     })
 
     Tower = Scaffold:CreateToggle({
