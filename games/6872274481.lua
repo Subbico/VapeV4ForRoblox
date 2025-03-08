@@ -5113,6 +5113,7 @@ local Downwards
 local Diagonal
 local LimitItem
 local Mouse
+local TowerCPS
 
 -- Pre-calculate adjacent positions
 local adjacent = table.create(26)
@@ -5199,6 +5200,74 @@ Scaffold = vape.Categories.Utility:CreateModule({
 
         if callback then
             local lastUpdate = tick()
+            local towerThread
+            
+            -- Handle tower building with CPS
+            local function startTowerBuild()
+                if towerThread then return end
+                towerThread = task.spawn(function()
+                    while Scaffold.Enabled and Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) do
+                        local root = entitylib.character.RootPart
+                        if root then
+                            root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                            
+                            -- Place block with CPS timing
+                            if entitylib.isAlive then
+                                local wool, amount = getScaffoldBlock()
+                                if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                    local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
+                                    local block, blockpos = getPlacedBlock(roundPos(pos))
+                                    if not block then
+                                        blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(pos)
+                                        if blockpos then
+                                            task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        task.wait(1 / TowerCPS.GetRandomValue())
+                    end
+                    towerThread = nil
+                end)
+            end
+            
+            local function stopTowerBuild()
+                if towerThread then
+                    task.cancel(towerThread)
+                    towerThread = nil
+                end
+            end
+            
+            -- Add tower input handlers
+            Scaffold:Clean(inputService.InputBegan:Connect(function(input)
+                if input.KeyCode == Enum.KeyCode.Space and Tower.Enabled then
+                    startTowerBuild()
+                end
+            end))
+            
+            Scaffold:Clean(inputService.InputEnded:Connect(function(input)
+                if input.KeyCode == Enum.KeyCode.Space then
+                    stopTowerBuild()
+                end
+            end))
+            
+            -- Mobile support
+            if inputService.TouchEnabled then
+                pcall(function()
+                    local touchGui = lplr.PlayerGui:WaitForChild("TouchGui", 2)
+                    if touchGui then
+                        local jumpButton = touchGui.TouchControlFrame:WaitForChild("JumpButton", 2)
+                        if jumpButton then
+                            Scaffold:Clean(jumpButton.MouseButton1Down:Connect(function()
+                                if Tower.Enabled then startTowerBuild() end
+                            end))
+                            Scaffold:Clean(jumpButton.MouseButton1Up:Connect(stopTowerBuild))
+                        end
+                    end
+                end)
+            end
+
             repeat
                 if entitylib.isAlive then
                     local wool, amount = getScaffoldBlock()
@@ -5215,10 +5284,6 @@ Scaffold = vape.Categories.Utility:CreateModule({
 
                     if wool then
                         local root = entitylib.character.RootPart
-                        if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and not inputService:GetFocusedTextBox() then
-                            root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
-                        end
-
                         local moveDir = entitylib.character.Humanoid.MoveDirection
                         local hipHeight = entitylib.character.HipHeight
                         local downOffset = Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5
@@ -5304,6 +5369,14 @@ Count = Scaffold:CreateToggle({
             label = nil
         end
     end
+})
+TowerCPS = Scaffold:CreateTwoSlider({
+    Name = 'Tower CPS',
+    Min = 1,
+    Max = 20,
+    DefaultMin = 12,
+    DefaultMax = 12,
+    Darker = true
 })
 
                                                                                                                                                                                                                                                                                                                                                 
