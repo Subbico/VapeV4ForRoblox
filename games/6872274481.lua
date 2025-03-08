@@ -1296,7 +1296,7 @@ run(function()
         end)
     end
 
-    -- Start auto-placing blocks for auto bridge
+    -- Start auto-placing blocks for auto bridge (same as mobile auto bridge code)
     local function StartAutoBridge()
         if autoBridgeThread then
             task.cancel(autoBridgeThread)  -- Cancel any existing thread if it's already running
@@ -1312,7 +1312,7 @@ run(function()
                             -- Get position in front of the player
                             local mouseinfo = blockPlacer.clientManager:getBlockSelector():getMouseInfo(0)
                             if mouseinfo and mouseinfo.placementPosition == mouseinfo.placementPosition then
-                                -- Place block at the position
+                                -- Place block at the position (same as the mobile auto bridge logic)
                                 task.spawn(blockPlacer.placeBlock, blockPlacer, mouseinfo.placementPosition)
                             end
                         end
@@ -1362,6 +1362,59 @@ run(function()
                         end))
                     end)
                 end
+
+                -- Mobile support for auto bridge (integrated with the building code)
+                AutoClicker:Clean(lplr.PlayerGui.MobileUI['5'].MouseButton1Down:Connect(function()
+                    StartAutoBridge()  -- Start auto-placing blocks for the bridge
+                end))
+
+                AutoClicker:Clean(lplr.PlayerGui.MobileUI['5'].MouseButton1Up:Connect(function()
+                    StopAutoBridge()  -- Stop auto-placing blocks when the button is released
+                end))
+
+            else
+                if Thread then
+                    task.cancel(Thread)
+                    Thread = nil
+                end
+                -- Ensure auto-bridge thread is canceled when autoclicker is disabled
+                StopAutoBridge()
+            end
+        end,
+        Tooltip = 'Hold attack button to automatically click'
+    })
+
+    -- CPS settings for sword
+    CPS = AutoClicker:CreateTwoSlider({
+        Name = 'CPS',
+        Min = 1,
+        Max = 9,
+        DefaultMin = 7,
+        DefaultMax = 7
+    })
+
+    -- Block CPS settings for auto bridge
+    AutoClicker:CreateToggle({
+        Name = 'Place Blocks',
+        Default = true,
+        Function = function(callback)
+            if BlockCPS.Object then
+                BlockCPS.Object.Visible = callback
+            end
+        end
+    })
+
+    BlockCPS = AutoClicker:CreateTwoSlider({
+        Name = 'Block CPS',
+        Min = 1,
+        Max = 12,
+        DefaultMin = 12,
+        DefaultMax = 12,
+        Darker = true
+    })
+
+end)
+
 
                 -- Mobile support for auto bridge
                 AutoClicker:Clean(lplr.PlayerGui.MobileUI['5'].MouseButton1Down:Connect(function()
