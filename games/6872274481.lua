@@ -5204,7 +5204,7 @@ run(function()
                         if wool then
                             local root = entitylib.character.RootPart
                             if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
-                                root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                                root.Velocity = Vector3.new(root.Velocity.X, 100, root.Velocity.Z) -- Increased jump height
                             end
     
                             for i = Expand.Value, 1, -1 do
@@ -5230,7 +5230,7 @@ run(function()
                         end
                     end
     
-                    task.wait(0.01 * SpeedSlider.Value) -- Adjust speed based on slider
+                    task.wait(0.0001 * SpeedSlider.Value) -- Adjusted for much faster speed
                 until not Scaffold.Enabled
             else
                 Label = nil
@@ -5248,8 +5248,8 @@ run(function()
     SpeedSlider = Scaffold:CreateSlider({ -- New slider for speed
         Name = 'Speed',
         Min = 1, 
-        Max = 10, 
-        Default = 5 -- Middle speed
+        Max = 100, -- Increased range for finer control
+        Default = 50 -- Middle speed
     })
     
     Tower = Scaffold:CreateToggle({
