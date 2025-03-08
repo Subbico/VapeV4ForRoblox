@@ -5115,15 +5115,64 @@ local LimitItem
 local Mouse
 local TowerCPS
 
+-- Pre-calculate adjacent positions
+local adjacent = table.create(26)
+for x = -3, 3, 3 do
+    for y = -3, 3, 3 do
+        for z = -3, 3, 3 do
+            if x ~= 0 or y ~= 0 or z ~= 0 then
+                adjacent[#adjacent + 1] = Vector3.new(x, y, z)
+            end
+        end
+    end
+end
+
 local lastpos = Vector3.zero
 local label
 local lastPlace = 0
 
--- Fast block placement helper
-local function placeBlockAt(pos, wool)
-    if not wool then return end
-    local blockpos = bedwars.BlockController:getBlockPosition(pos)
-    task.spawn(bedwars.placeBlock, blockpos * 3, wool, false)
+-- Optimized corner check using cached unit vectors
+local function nearCorner(poscheck, pos)
+    local offset = Vector3.new(3, 3, 3)
+    local startpos = poscheck - offset
+    local endpos = poscheck + offset
+    local dir = (pos - poscheck).Unit
+    local check = poscheck + dir * 100
+    return Vector3.new(
+        math.clamp(check.X, startpos.X, endpos.X),
+        math.clamp(check.Y, startpos.Y, endpos.Y),
+        math.clamp(check.Z, startpos.Z, endpos.Z)
+    )
+end
+
+-- Optimized block proximity check with local caching
+local function blockProximity(pos)
+    local mag = 60
+    local returned
+    local startPos = bedwars.BlockController:getBlockPosition(pos - Vector3.new(15, 15, 15))
+    local endPos = bedwars.BlockController:getBlockPosition(pos + Vector3.new(15, 15, 15))
+    local blocks = getBlocksInPoints(startPos, endPos)
+    
+    for i = 1, #blocks do
+        local blockpos = nearCorner(blocks[i], pos)
+        local newmag = (pos - blockpos).Magnitude
+        if newmag < mag then
+            mag = newmag
+            returned = blockpos
+        end
+    end
+    table.clear(blocks)
+    return returned
+end
+
+-- Optimized adjacent check
+local function checkAdjacent(pos)
+    for i = 1, #adjacent do
+        if getPlacedBlock(pos + adjacent[i]) then
+            return true
+        end
+    end
+    return false
 end
 
 local function getScaffoldBlock()
@@ -5157,6 +5206,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
             local function startTowerBuild()
                 if towerThread then return end
                 towerThread = task.spawn(function()
+                    local lastBlockPos = nil
                     while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or 
                         (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)) do
                         local currentTime = tick()
@@ -5167,11 +5217,24 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                     -- Apply upward velocity
                                     root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
                                     
-                                    -- Get block and place directly under
+                                    -- Get block and place with proper checks
                                     local wool = getScaffoldBlock()
                                     if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        placeBlockAt(root.Position - Vector3.new(0, 3, 0), wool)
-                                        lastPlace = currentTime
+                                        local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
+                                        local roundedPos = roundPos(pos)
+                                        
+                                        -- Only do proximity check if position changed
+                                        if lastBlockPos ~= roundedPos then
+                                            local block, blockpos = getPlacedBlock(roundedPos)
+                                            if not block then
+                                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(pos)
+                                                if blockpos then
+                                                    task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                                    lastPlace = currentTime
+                                                    lastBlockPos = roundedPos
+                                                end
+                                            end
+                                        end
                                     end
                                 end
                             end
@@ -5240,7 +5303,6 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         local downOffset = Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5
                         local basePos = root.Position - Vector3.new(0, hipHeight + downOffset, 0)
 
-                        -- Fast scaffold placement
                         for i = Expand.Value, 1, -1 do
                             local currentpos = roundPos(basePos + moveDir * (i * 3))
                             
@@ -5255,7 +5317,13 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                 end
                             end
 
-                            placeBlockAt(currentpos, wool)
+                            local block, blockpos = getPlacedBlock(currentpos)
+                            if not block then
+                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
+                                if blockpos then
+                                    task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                end
+                            end
                             lastpos = currentpos
                         end
                     end
@@ -5324,6 +5392,7 @@ TowerCPS = Scaffold:CreateTwoSlider({
     DefaultMax = 20,
     Darker = true
 })
+
                                                                                                                                                                                                                                                                                                                                                 
 																																																																													
 run(function()
