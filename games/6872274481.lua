@@ -5115,63 +5115,15 @@ local LimitItem
 local Mouse
 local TowerCPS
 
--- Pre-calculate adjacent positions
-local adjacent = table.create(26)
-for x = -3, 3, 3 do
-    for y = -3, 3, 3 do
-        for z = -3, 3, 3 do
-            if x ~= 0 or y ~= 0 or z ~= 0 then
-                adjacent[#adjacent + 1] = Vector3.new(x, y, z)
-            end
-        end
-    end
-end
-
 local lastpos = Vector3.zero
 local label
+local lastPlace = 0
 
--- Optimized corner check using cached unit vectors
-local function nearCorner(poscheck, pos)
-    local offset = Vector3.new(3, 3, 3)
-    local startpos = poscheck - offset
-    local endpos = poscheck + offset
-    local dir = (pos - poscheck).Unit
-    local check = poscheck + dir * 100
-    return Vector3.new(
-        math.clamp(check.X, startpos.X, endpos.X),
-        math.clamp(check.Y, startpos.Y, endpos.Y),
-        math.clamp(check.Z, startpos.Z, endpos.Z)
-    )
-end
-
--- Optimized block proximity check with local caching
-local function blockProximity(pos)
-    local mag = 60
-    local returned
-    local startPos = bedwars.BlockController:getBlockPosition(pos - Vector3.new(15, 15, 15))  
-    local endPos = bedwars.BlockController:getBlockPosition(pos + Vector3.new(15, 15, 15))
-    local blocks = getBlocksInPoints(startPos, endPos)
-    
-    for i = 1, #blocks do
-        local blockpos = nearCorner(blocks[i], pos)
-        local newmag = (pos - blockpos).Magnitude
-        if newmag < mag then
-            mag = newmag
-            returned = blockpos
-        end
-    end
-    table.clear(blocks)
-    return returned
-end
-
--- Optimized adjacent check using table.find
-local function checkAdjacent(pos)
-    for i = 1, #adjacent do
-        if getPlacedBlock(pos + adjacent[i]) then
-            return true
-        end
-    end
-    return false
+-- Fast block placement helper
+local function placeBlockAt(pos, wool)
+    if not wool then return end
+    local blockpos = bedwars.BlockController:getBlockPosition(pos)
+    task.spawn(bedwars.placeBlock, blockpos * 3, wool, false)
 end
 
 local function getScaffoldBlock()
@@ -5199,34 +5151,32 @@ Scaffold = vape.Categories.Utility:CreateModule({
         end
 
         if callback then
-            local lastUpdate = tick()
             local towerThread
-            local lastTowerPlace = 0
             
-            -- Handle tower building with CPS
+            -- Fast tower building with CPS
             local function startTowerBuild()
                 if towerThread then return end
                 towerThread = task.spawn(function()
-                    while Scaffold.Enabled and Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) do
-                        local root = entitylib.character.RootPart
-                        if root then
-                            root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
-                            
-                            -- Place block with CPS timing
+                    while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or 
+                        (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)) do
+                        local currentTime = tick()
+                        if currentTime - lastPlace >= (1 / TowerCPS.GetRandomValue()) then
                             if entitylib.isAlive then
-                                local currentTime = tick()
-                                if currentTime - lastTowerPlace >= (1 / TowerCPS.GetRandomValue()) then
-                                    local wool, amount = getScaffoldBlock()
+                                local root = entitylib.character.RootPart
+                                if root then
+                                    -- Apply upward velocity
+                                    root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                                    
+                                    -- Get block and place directly under
+                                    local wool = getScaffoldBlock()
                                     if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
-                                        local blockpos = bedwars.BlockController:getBlockPosition(pos)
-                                        task.spawn(bedwars.placeBlock, blockpos * 3, wool, false)
-                                        lastTowerPlace = currentTime
+                                        placeBlockAt(root.Position - Vector3.new(0, 3, 0), wool)
+                                        lastPlace = currentTime
                                     end
                                 end
                             end
                         end
-                        task.wait(0.01)  
+                        task.wait(0.01)
                     end
                     towerThread = nil
                 end)
@@ -5239,7 +5189,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                 end
             end
             
-            -- Add tower input handlers
+            -- Input handlers for tower
             Scaffold:Clean(inputService.InputBegan:Connect(function(input)
                 if input.KeyCode == Enum.KeyCode.Space and Tower.Enabled then
                     startTowerBuild()
@@ -5268,6 +5218,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                 end)
             end
 
+            -- Main scaffold loop
             repeat
                 if entitylib.isAlive then
                     local wool, amount = getScaffoldBlock()
@@ -5289,6 +5240,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         local downOffset = Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5
                         local basePos = root.Position - Vector3.new(0, hipHeight + downOffset, 0)
 
+                        -- Fast scaffold placement
                         for i = Expand.Value, 1, -1 do
                             local currentpos = roundPos(basePos + moveDir * (i * 3))
                             
@@ -5303,16 +5255,12 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                 end
                             end
 
-                            local block, blockpos = getPlacedBlock(currentpos)
-                            if not block then
-                                task.spawn(bedwars.placeBlock, blockpos * 3, wool, false)
-                            end
+                            placeBlockAt(currentpos, wool)
                             lastpos = currentpos
                         end
                     end
                 end
-
-                task.wait(0.01)  
+                task.wait(0.01)
             until not Scaffold.Enabled
         else
             Label = nil
@@ -5371,9 +5319,9 @@ Count = Scaffold:CreateToggle({
 TowerCPS = Scaffold:CreateTwoSlider({
     Name = 'Tower CPS',
     Min = 1,
-    Max = 20,
-    DefaultMin = 12,
-    DefaultMax = 12,
+    Max = 40,
+    DefaultMin = 20,
+    DefaultMax = 20,
     Darker = true
 })
                                                                                                                                                                                                                                                                                                                                                 
