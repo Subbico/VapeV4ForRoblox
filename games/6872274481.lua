@@ -5315,11 +5315,10 @@ Scaffold = vape.Categories.Utility:CreateModule({
                     end
                 end
 
-                -- Dynamic wait time based on performance
                 local currentTime = tick()
                 local deltaTime = currentTime - lastUpdate
                 lastUpdate = currentTime
-                task.wait(math.max(0.01, math.min(0.03, deltaTime * 0.5))) -- Adaptive delay
+                task.wait(math.max(0.01, math.min(0.03, deltaTime * 0.5)))
             until not Scaffold.Enabled
         else
             Label = nil
@@ -5328,26 +5327,30 @@ Scaffold = vape.Categories.Utility:CreateModule({
     Tooltip = 'Helps you make bridges/scaffold walk.'
 })
 
--- Rest of the UI setup code remains the same
 Expand = Scaffold:CreateSlider({
     Name = 'Expand',
     Min = 1,
     Max = 6
 })
+
 Tower = Scaffold:CreateToggle({
     Name = 'Tower',
     Default = true
 })
+
 Downwards = Scaffold:CreateToggle({
     Name = 'Downwards',
     Default = true
 })
+
 Diagonal = Scaffold:CreateToggle({
     Name = 'Diagonal',
     Default = true
 })
+
 LimitItem = Scaffold:CreateToggle({Name = 'Limit to items'})
 Mouse = Scaffold:CreateToggle({Name = 'Require mouse down'})
+
 Count = Scaffold:CreateToggle({
     Name = 'Block Count',
     Function = function(callback)
@@ -5370,6 +5373,7 @@ Count = Scaffold:CreateToggle({
         end
     end
 })
+
 TowerCPS = Scaffold:CreateTwoSlider({
     Name = 'Tower CPS',
     Min = 1,
