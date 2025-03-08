@@ -5242,7 +5242,7 @@ run(function()
                             local root = entitylib.character.RootPart
 
                             -- Tower functionality
-                            if Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or inputService:IsMouseButtonPressed(0)) and (not inputService:GetFocusedTextBox()) then
+                            if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
                                 local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0))
 
                                 -- Place blocks upward at the specified speed
@@ -5253,8 +5253,7 @@ run(function()
                                     currentpos = currentpos + Vector3.new(0, 3, 0) -- Move upward for the next block
                                 end
 
-                                -- Adjust delay based on speed
-                                task.wait(1 / TowerSpeed.Value) -- Faster speed = smaller delay
+                                -- No delay for maximum speed
                             end
 
                             -- Normal scaffold functionality
@@ -5281,7 +5280,7 @@ run(function()
                         end
                     end
 
-                    task.wait(0.03)
+                    task.wait() -- No fixed delay for maximum speed
                 until not Scaffold.Enabled
             else
                 Label = nil
