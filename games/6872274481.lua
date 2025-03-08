@@ -5114,9 +5114,8 @@ run(function()
     local Diagonal
     local LimitItem
     local Mouse
-    local SpeedSlider
     local adjacent, lastpos, label = {}, Vector3.zero
-    
+
     for x = -3, 3, 3 do
         for y = -3, 3, 3 do
             for z = -3, 3, 3 do
@@ -5127,7 +5126,37 @@ run(function()
             end
         end
     end
-    
+
+    local function nearCorner(poscheck, pos)
+        local startpos = poscheck - Vector3.new(3, 3, 3)
+        local endpos = poscheck + Vector3.new(3, 3, 3)
+        local check = poscheck + (pos - poscheck).Unit * 100
+        return Vector3.new(math.clamp(check.X, startpos.X, endpos.X), math.clamp(check.Y, startpos.Y, endpos.Y), math.clamp(check.Z, startpos.Z, endpos.Z))
+    end
+
+    local function blockProximity(pos)
+        local mag, returned = 60
+        local tab = getBlocksInPoints(bedwars.BlockController:getBlockPosition(pos - Vector3.new(21, 21, 21)), bedwars.BlockController:getBlockPosition(pos + Vector3.new(21, 21, 21)))
+        for _, v in tab do
+            local blockpos = nearCorner(v, pos)
+            local newmag = (pos - blockpos).Magnitude
+            if newmag < mag then
+                mag, returned = newmag, blockpos
+            end
+        end
+        table.clear(tab)
+        return returned
+    end
+
+    local function checkAdjacent(pos)
+        for _, v in adjacent do
+            if getPlacedBlock(pos + v) then
+                return true
+            end
+        end
+        return false
+    end
+
     local function getScaffoldBlock()
         if store.hand.toolType == 'block' then
             return store.hand.tool.Name, store.hand.amount
@@ -5145,60 +5174,84 @@ run(function()
         end
         return nil, 0
     end
-    
+
     Scaffold = vape.Categories.Utility:CreateModule({
         Name = 'Scaffold',
         Function = function(callback)
             if label then
                 label.Visible = callback
             end
-    
+
             if callback then
                 repeat
                     if entitylib.isAlive then
                         local wool, amount = getScaffoldBlock()
-    
+
                         if Mouse.Enabled then
                             if not inputService:IsMouseButtonPressed(0) then
                                 wool = nil
                             end
                         end
-    
+
                         if label then
                             amount = amount or 0
                             label.Text = amount..' <font color="rgb(170, 170, 170)">(Scaffold)</font>'
                             label.TextColor3 = Color3.fromHSV((amount / 128) / 2.8, 0.86, 1)
                         end
-    
+
                         if wool then
                             local root = entitylib.character.RootPart
-                            local humanoid = entitylib.character.Humanoid
-
-                            -- Custom Tower Logic
                             if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
-                                root.Velocity = Vector3.new(root.Velocity.X, 50, root.Velocity.Z) -- Higher jump velocity
-                                humanoid:ChangeState(Enum.HumanoidStateType.Jumping) -- Force jump state
-                            end
-    
-                            -- Fast block placement (respects 13 CPS cap)
-                            local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * 3)
-                            if not getPlacedBlock(currentpos) then
-                                -- Check if the block position is valid before placing
-                                local isValid = true
-                                for _, v in adjacent do
-                                    if getPlacedBlock(currentpos + v) then
-                                        isValid = false
-                                        break
+                                root.Velocity = Vector3.new(root.Velocity.X, 60, root.Velocity.Z)  -- Increased vertical velocity
+
+                                for i = 1, 3 do  -- Place multiple blocks per iteration
+                                    for j = Expand.Value, 1, -1 do
+                                        local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (j * 3))
+                                        if Diagonal.Enabled then
+                                            if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
+                                                local dt = (lastpos - currentpos)
+                                                if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
+                                                    currentpos = lastpos
+                                                end
+                                            end
+                                        end
+
+                                        local block, blockpos = getPlacedBlock(currentpos)
+                                        if not block then
+                                            blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
+                                            if blockpos then
+                                                task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                            end
+                                        end
+                                        lastpos = currentpos
                                     end
+                                    task.wait(0.01)  -- Reduced delay for faster placement
                                 end
-                                if isValid then
-                                    task.spawn(bedwars.placeBlock, currentpos, wool, false)
+                            else
+                                for i = Expand.Value, 1, -1 do
+                                    local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (i * 3))
+                                    if Diagonal.Enabled then
+                                        if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
+                                            local dt = (lastpos - currentpos)
+                                            if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
+                                                currentpos = lastpos
+                                            end
+                                        end
+                                    end
+
+                                    local block, blockpos = getPlacedBlock(currentpos)
+                                    if not block then
+                                        blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
+                                        if blockpos then
+                                            task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                        end
+                                    end
+                                    lastpos = currentpos
                                 end
                             end
                         end
                     end
-    
-                    task.wait(1 / 13) -- Respects the 13 CPS cap
+                    task.wait(0.03)
                 until not Scaffold.Enabled
             else
                 Label = nil
@@ -5206,35 +5259,32 @@ run(function()
         end,
         Tooltip = 'Helps you make bridges/scaffold walk.'
     })
-    
+
     Expand = Scaffold:CreateSlider({
         Name = 'Expand',
         Min = 1,
-        Max = 6
+        Max = 13  -- Increased max value to 13
     })
-    
-    SpeedSlider = Scaffold:CreateSlider({ -- Updated slider for CPS
-        Name = 'Speed (CPS)',
-        Min = 1, 
-        Max = 13, -- Maximum CPS in BedWars
-        Default = 13, -- Default to maximum speed
-        Tooltip = 'Controls how many blocks are placed per second (1-13).'
-    })
-    
+
     Tower = Scaffold:CreateToggle({
         Name = 'Tower',
         Default = true
     })
+
     Downwards = Scaffold:CreateToggle({
         Name = 'Downwards',
         Default = true
     })
+
     Diagonal = Scaffold:CreateToggle({
         Name = 'Diagonal',
         Default = true
     })
+
     LimitItem = Scaffold:CreateToggle({Name = 'Limit to items'})
+
     Mouse = Scaffold:CreateToggle({Name = 'Require mouse down'})
+
     Count = Scaffold:CreateToggle({
         Name = 'Block Count',
         Function = function(callback)
