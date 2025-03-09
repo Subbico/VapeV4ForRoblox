@@ -3300,12 +3300,10 @@ run(function()
 		projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
 	end)
 	
-	local function getAmmo(check, toolType)
+	local function getAmmo(check)
 		for _, item in store.inventory.inventory.items do
 			if check.ammoItemTypes and table.find(check.ammoItemTypes, item.itemType) then
-				if not ToolCheck.Enabled or (toolType and table.find(ToolList.ListEnabled, toolType)) then
-					return item.itemType
-				end
+				return item.itemType
 			end
 		end
 	end
@@ -3313,18 +3311,24 @@ run(function()
 	local function getProjectiles()
 		local items = {}
 		for _, item in store.inventory.inventory.items do
-			local proj = bedwars.ItemMeta[item.itemType].projectileSource
-			local ammo = proj and getAmmo(proj, item.itemType)
-			if ammo and table.find(List.ListEnabled, ammo) then
-				table.insert(items, {
-					item,
-					ammo,
-					proj.projectileType(ammo),
-					proj
-				})
+			if not ToolCheck.Enabled or (item.tool and table.find(ToolList.ListEnabled, item.tool)) then
+				local proj = bedwars.ItemMeta[item.itemType].projectileSource
+				local ammo = proj and getAmmo(proj)
+				if ammo and table.find(List.ListEnabled, ammo) then
+					table.insert(items, {
+						item,
+						ammo,
+						proj.projectileType(ammo),
+						proj
+					})
+				end
 			end
 		end
 		return items
+	end
+	
+	local function isToolEnabled(tool)
+		return not ToolCheck.Enabled or (ToolList.ListEnabled and table.find(ToolList.ListEnabled, tool))
 	end
 	
 	ProjectileAura = vape.Categories.Blatant:CreateModule({
