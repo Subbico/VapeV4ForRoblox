@@ -3239,7 +3239,6 @@ run(function()
 	})
 end)
 	
-local function run()
     local ProjectileAura
     local Targets
     local Range
@@ -3422,8 +3421,6 @@ local function run()
         Function = function() end
     })
 end
-
-run()
 
 	
 run(function()
