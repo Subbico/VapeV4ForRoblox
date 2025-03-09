@@ -7738,19 +7738,22 @@ run(function()
 		Name = 'Limit to items',
 		Tooltip = 'Only breaks when tools are held'
 	})
-	AutoTool = vape.Categories.Utility:CreateModule({
+	AutoTool = Breaker:CreateToggle({
 		Name = 'Auto Tool',
+		Default = true,
 		Function = function(callback)
 			if callback then
 				event = Instance.new('BindableEvent')
-				AutoTool:Clean(event)
-				AutoTool:Clean(event.Event:Connect(function()
+				Breaker:Clean(event)
+				Breaker:Clean(event.Event:Connect(function()
 					contextActionService:CallFunction('block-break', Enum.UserInputState.Begin, newproxy(true))
 				end))
 				old = bedwars.BlockBreaker.hitBlock
 				bedwars.BlockBreaker.hitBlock = function(self, maid, raycastparams, ...)
 					local block = self.clientManager:getBlockSelector():getMouseInfo(1, {ray = raycastparams})
-					if switchHotbarItem(block and block.target and block.target.blockInstance or nil) then return end
+					if block and block.target then
+						if switchHotbarItem(block.target.blockInstance) then return end
+					end
 					return old(self, maid, raycastparams, ...)
 				end
 			else
