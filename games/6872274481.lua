@@ -5220,8 +5220,21 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                     local moveDir = humanoid.MoveDirection
                                     local isMoving = moveDir.Magnitude > 0
                                     
-                                    -- Handle jump animation based on movement and block state
-                                    if wool or not LimitItem.Enabled then
+                                    -- Check if we can place a block underneath
+                                    local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
+                                    local roundedPos = roundPos(pos)
+                                    local canPlace = false
+                                    
+                                    if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                        local block, blockpos = getPlacedBlock(roundedPos)
+                                        if not block then
+                                            blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(pos)
+                                            canPlace = blockpos ~= nil
+                                        end
+                                    end
+                                    
+                                    -- Only apply velocity and handle animation if we can place blocks
+                                    if (wool or not LimitItem.Enabled) and canPlace then
                                         -- Apply velocity
                                         root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
                                         
@@ -5239,23 +5252,21 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                                 jumpAnim = nil
                                             end
                                         end
+                                    else
+                                        -- Stop animation if we can't place blocks
+                                        if jumpAnim then
+                                            jumpAnim:Stop()
+                                            jumpAnim = nil
+                                        end
                                     end
                                     
-                                    -- Place blocks if we have them
-                                    if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
-                                        local roundedPos = roundPos(pos)
-                                        
-                                        -- Only do proximity check if position changed
+                                    -- Place blocks if we have them and can place
+                                    if wool and canPlace and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
                                         if lastBlockPos ~= roundedPos then
-                                            local block, blockpos = getPlacedBlock(roundedPos)
-                                            if not block then
-                                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(pos)
-                                                if blockpos then
-                                                    task.spawn(bedwars.placeBlock, blockpos, wool, false)
-                                                    lastPlace = currentTime
-                                                    lastBlockPos = roundedPos
-                                                end
+                                            if blockpos then
+                                                task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                                lastPlace = currentTime
+                                                lastBlockPos = roundedPos
                                             end
                                         end
                                     end
