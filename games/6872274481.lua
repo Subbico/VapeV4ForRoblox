@@ -5207,34 +5207,38 @@ Scaffold = vape.Categories.Utility:CreateModule({
                 if towerThread then return end
                 towerThread = task.spawn(function()
                     local lastBlockPos = nil
+                    local lastJumpTime = 0
                     while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or 
                         (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)) do
                         local currentTime = tick()
-                        if currentTime - lastPlace >= (1 / TowerCPS.GetRandomValue()) then
-                            if entitylib.isAlive then
-                                local root = entitylib.character.RootPart
-                                if root then
-                                    local wool = getScaffoldBlock()
-                                    -- Only apply velocity if we have blocks or LimitItem is off
-                                    if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                        if entitylib.isAlive then
+                            local root = entitylib.character.RootPart
+                            if root then
+                                local wool = getScaffoldBlock()
+                                -- Only apply velocity if we have blocks or LimitItem is off
+                                if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                    -- Adjust velocity based on block placement timing
+                                    if currentTime - lastJumpTime >= 0.2 then  -- Delay between jumps
+                                        root.Velocity = Vector3.new(root.Velocity.X, 35, root.Velocity.Z)  -- Slightly reduced velocity
+                                        lastJumpTime = currentTime
                                     end
+                                end
+                                
+                                -- Place blocks if we have them
+                                if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                    -- Place blocks slightly ahead of the player
+                                    local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 2, 0)
+                                    local roundedPos = roundPos(pos)
                                     
-                                    -- Place blocks if we have them
-                                    if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
-                                        local roundedPos = roundPos(pos)
-                                        
-                                        -- Only do proximity check if position changed
-                                        if lastBlockPos ~= roundedPos then
-                                            local block, blockpos = getPlacedBlock(roundedPos)
-                                            if not block then
-                                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(pos)
-                                                if blockpos then
-                                                    task.spawn(bedwars.placeBlock, blockpos, wool, false)
-                                                    lastPlace = currentTime
-                                                    lastBlockPos = roundedPos
-                                                end
+                                    -- Only do proximity check if position changed
+                                    if lastBlockPos ~= roundedPos and currentTime - lastPlace >= (1 / TowerCPS.GetRandomValue()) then
+                                        local block, blockpos = getPlacedBlock(roundedPos)
+                                        if not block then
+                                            blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(pos)
+                                            if blockpos then
+                                                task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                                lastPlace = currentTime
+                                                lastBlockPos = roundedPos
                                             end
                                         end
                                     end
@@ -5394,6 +5398,7 @@ TowerCPS = Scaffold:CreateTwoSlider({
     DefaultMax = 20,
     Darker = true
 })
+
 
                                                                                                                                                                                                                                                                                                                                                 
 																																																																													
