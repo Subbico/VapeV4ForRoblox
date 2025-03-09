@@ -3239,11 +3239,12 @@ run(function()
 	})
 end)
 	
-run(function()
-	local ProjectileAura
+local ProjectileAura
 	local Targets
 	local Range
 	local List
+	local ToolCheck
+	local ToolList
 	local rayCheck = RaycastParams.new()
 	rayCheck.FilterType = Enum.RaycastFilterType.Include
 	local projectileRemote = {InvokeServer = function() end}
@@ -3266,6 +3267,12 @@ run(function()
 			local proj = bedwars.ItemMeta[item.itemType].projectileSource
 			local ammo = proj and getAmmo(proj)
 			if ammo and table.find(List.ListEnabled, ammo) then
+				-- Check if tool check is enabled and if the tool is in the allowed list
+				if ToolCheck.Enabled then
+					if not table.find(ToolList.ListEnabled, item.itemType) then
+						continue
+					end
+				end
 				table.insert(items, {
 					item,
 					ammo,
@@ -3351,6 +3358,14 @@ run(function()
 		Suffix = function(val)
 			return val == 1 and 'stud' or 'studs'
 		end
+	})
+	ToolCheck = ProjectileAura:CreateToggle({
+		Name = 'Tool Check',
+		Default = false
+	})
+	ToolList = ProjectileAura:CreateTextList({
+		Name = 'Tools',
+		Default = {'wood_bow', 'stone_bow'}
 	})
 end)
 	
