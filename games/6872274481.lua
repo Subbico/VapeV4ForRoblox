@@ -5166,6 +5166,7 @@ for x = -3, 3, 3 do
 end
 
 local lastpos = Vector3.zero
+local thread
 
 -- Block proximity check
 local function blockProximity(pos)
@@ -5209,6 +5210,24 @@ local function getScaffoldBlock()
     return nil, 0
 end
 
+local function startInfiniteJump()
+    if thread then return end
+    thread = task.spawn(function()
+        while task.wait() do
+            if not (Scaffold.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space)) then
+                break
+            end
+            if entitylib.isAlive then
+                local root = entitylib.character.RootPart
+                if root then
+                    root.Velocity = Vector3.new(root.Velocity.X, 45, root.Velocity.Z)
+                end
+            end
+        end
+        thread = nil
+    end)
+end
+
 Scaffold = vape.Categories.Utility:CreateModule({
     Name = 'Scaffold',
     Function = function(callback)
@@ -5217,6 +5236,13 @@ Scaffold = vape.Categories.Utility:CreateModule({
         end
 
         if callback then
+            -- Setup infinite jump
+            Scaffold:Clean(inputService.InputBegan:Connect(function(input)
+                if input.KeyCode == Enum.KeyCode.Space then
+                    startInfiniteJump()
+                end
+            end))
+
             repeat
                 if entitylib.isAlive then
                     local wool, amount = getScaffoldBlock()
@@ -5237,11 +5263,6 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         local hipHeight = entitylib.character.HipHeight
                         local downOffset = Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 2
                         local basePos = root.Position - Vector3.new(0, hipHeight + downOffset, 0)
-
-                        -- Apply infinite jump
-                        if inputService:IsKeyDown(Enum.KeyCode.Space) then
-                            root.Velocity = Vector3.new(root.Velocity.X, 45, root.Velocity.Z)
-                        end
 
                         for i = Expand.Value, 1, -1 do
                             local currentpos = roundPos(basePos + moveDir * (i * 3))
@@ -5270,6 +5291,11 @@ Scaffold = vape.Categories.Utility:CreateModule({
                 end
                 task.wait()
             until not Scaffold.Enabled
+
+            if thread then
+                task.cancel(thread)
+                thread = nil
+            end
         end
     end,
     Tooltip = 'Enhanced scaffold with infinite jump'
