@@ -5112,7 +5112,7 @@ local Tower
 local Downwards
 local Diagonal
 local LimitItem
-local Mouse
+local Mousei
 local TowerCPS
 
 -- Pre-calculate adjacent positions
@@ -5207,6 +5207,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                 if towerThread then return end
                 towerThread = task.spawn(function()
                     local lastBlockPos = nil
+                    local jumpAnim = nil
                     while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or 
                         (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)) do
                         local currentTime = tick()
@@ -5214,10 +5215,30 @@ Scaffold = vape.Categories.Utility:CreateModule({
                             if entitylib.isAlive then
                                 local root = entitylib.character.RootPart
                                 if root then
-                                    local wool = getScaffoldBlock()
-                                    -- Only apply velocity if we have blocks or LimitItem is off
-                                    if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                    local wool, amount = getScaffoldBlock()
+                                    local humanoid = entitylib.character.Humanoid
+                                    local moveDir = humanoid.MoveDirection
+                                    local isMoving = moveDir.Magnitude > 0
+                                    
+                                    -- Handle jump animation based on movement and block state
+                                    if wool or not LimitItem.Enabled then
+                                        -- Apply velocity
                                         root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                                        
+                                        -- Handle animation
+                                        if isMoving then
+                                            -- Play jump animation when moving
+                                            if not jumpAnim then
+                                                jumpAnim = humanoid:LoadAnimation(humanoid.JumpAnim)
+                                                jumpAnim:Play()
+                                            end
+                                        else
+                                            -- Stop jump animation when not moving
+                                            if jumpAnim then
+                                                jumpAnim:Stop()
+                                                jumpAnim = nil
+                                            end
+                                        end
                                     end
                                     
                                     -- Place blocks if we have them
@@ -5242,6 +5263,11 @@ Scaffold = vape.Categories.Utility:CreateModule({
                             end
                         end
                         task.wait(0.01)
+                    end
+                    -- Clean up animation when tower ends
+                    if jumpAnim then
+                        jumpAnim:Stop()
+                        jumpAnim = nil
                     end
                     towerThread = nil
                 end)
