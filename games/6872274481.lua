@@ -5175,6 +5175,27 @@ local function checkAdjacent(pos)
     return false
 end
 
+-- Get position under legs for block placement
+local function getLegPosition(character)
+    local root = character.RootPart
+    local humanoid = character.Humanoid
+    -- Calculate leg position (slightly above feet to ensure proper placement)
+    return root.Position - Vector3.new(0, humanoid.HipHeight + 1.5, 0)
+end
+
+-- Check if we can place at position
+local function canPlaceAt(position, checkAdjacent)
+    local roundedPos = roundPos(position)
+    local block, blockpos = getPlacedBlock(roundedPos)
+    if not block then
+        if checkAdjacent then
+            blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(position)
+        end
+        return blockpos ~= nil, blockpos
+    end
+    return false, nil
+end
+
 local function getScaffoldBlock()
     if store.hand.toolType == 'block' then
         return store.hand.tool.Name, store.hand.amount
@@ -5220,20 +5241,11 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                     local moveDir = humanoid.MoveDirection
                                     local isMoving = moveDir.Magnitude > 0
                                     
-                                    -- Check if we can place a block underneath
-                                    local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
-                                    local roundedPos = roundPos(pos)
-                                    local canPlace = false
+                                    -- Get position under legs
+                                    local legPos = getLegPosition(entitylib.character)
+                                    local canPlace, blockpos = canPlaceAt(legPos, checkAdjacent)
                                     
-                                    if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        local block, blockpos = getPlacedBlock(roundedPos)
-                                        if not block then
-                                            blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(pos)
-                                            canPlace = blockpos ~= nil
-                                        end
-                                    end
-                                    
-                                    -- Only apply velocity and handle animation if we can place blocks
+                                    -- Only apply velocity and handle animation if we can place blocks under legs
                                     if (wool or not LimitItem.Enabled) and canPlace then
                                         -- Apply velocity
                                         root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
@@ -5262,11 +5274,12 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                     
                                     -- Place blocks if we have them and can place
                                     if wool and canPlace and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        if lastBlockPos ~= roundedPos then
+                                        local roundedLegPos = roundPos(legPos)
+                                        if lastBlockPos ~= roundedLegPos then
                                             if blockpos then
                                                 task.spawn(bedwars.placeBlock, blockpos, wool, false)
                                                 lastPlace = currentTime
-                                                lastBlockPos = roundedPos
+                                                lastBlockPos = roundedLegPos
                                             end
                                         end
                                     end
@@ -5338,9 +5351,9 @@ Scaffold = vape.Categories.Utility:CreateModule({
                     if wool then
                         local root = entitylib.character.RootPart
                         local moveDir = entitylib.character.Humanoid.MoveDirection
-                        local hipHeight = entitylib.character.HipHeight
-                        local downOffset = Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5
-                        local basePos = root.Position - Vector3.new(0, hipHeight + downOffset, 0)
+                        -- Get position under legs for scaffold
+                        local legPos = getLegPosition(entitylib.character)
+                        local basePos = legPos
 
                         for i = Expand.Value, 1, -1 do
                             local currentpos = roundPos(basePos + moveDir * (i * 3))
@@ -5356,12 +5369,9 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                 end
                             end
 
-                            local block, blockpos = getPlacedBlock(currentpos)
-                            if not block then
-                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
-                                if blockpos then
-                                    task.spawn(bedwars.placeBlock, blockpos, wool, false)
-                                end
+                            local canPlace, blockpos = canPlaceAt(currentpos, checkAdjacent)
+                            if canPlace and blockpos then
+                                task.spawn(bedwars.placeBlock, blockpos, wool, false)
                             end
                             lastpos = currentpos
                         end
@@ -5431,7 +5441,6 @@ TowerCPS = Scaffold:CreateTwoSlider({
     DefaultMax = 20,
     Darker = true
 })
-
                                                                                                                                                                                                                                                                                                                                                 
 																																																																													
 run(function()
