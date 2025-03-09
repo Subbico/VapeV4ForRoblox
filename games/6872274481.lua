@@ -1,4 +1,6 @@
 --This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.
+--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.
+--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.
 local run = function(func)
 	func()
 end
@@ -734,7 +736,7 @@ run(function()
 		FireProjectile = debug.getupvalue(Knit.Controllers.ProjectileController.launchProjectileWithValues, 2),
 		GroundHit = Knit.Controllers.FallDamageController.KnitStart,
 		GuitarHeal = Knit.Controllers.GuitarController.performHeal,
-		--HannahKill = debug.getproto(debug.getproto(Knit.Controllers.HannahController.KnitStart, 2), 1),
+		HannahKill = debug.getproto(Knit.Controllers.HannahController.registerExecuteInteractions, 1),
 		HarvestCrop = debug.getproto(debug.getproto(Knit.Controllers.CropController.KnitStart, 4), 1),
 		--KaliyahPunch = debug.getproto(debug.getproto(Knit.Controllers.DragonSlayerController.KnitStart, 2), 1),
 		MageSelect = debug.getproto(Knit.Controllers.MageController.registerTomeInteraction, 1),
@@ -745,7 +747,8 @@ run(function()
 		ResetCharacter = debug.getproto(Knit.Controllers.ResetController.createBindable, 1),
 		SpawnRaven = Knit.Controllers.RavenController.spawnRaven,
 		SummonerClawAttack = Knit.Controllers.SummonerClawController.attack,
-		WarlockTarget = debug.getproto(Knit.Controllers.WarlockStaffController.KnitStart, 3)
+		WarlockTarget = debug.getproto(Knit.Controllers.WarlockStaffController.KnitStart, 3),
+		GuitarHealRemote = Knit.Controllers.GuitarController.performHeal
 	}
 
 	local function dumpRemote(tab)
@@ -761,9 +764,7 @@ run(function()
 
 	for i, v in remoteNames do
 		local remote = dumpRemote(debug.getconstants(v))
-		if i == "HannahKill" then
-			remote = "HannahPromptTrigger"
-		elseif i == "ConsumeBattery" then
+		if i == "ConsumeBattery" then
 			remote = "ConsumeBattery"
 		end
 		if remote == '' then
@@ -1356,7 +1357,52 @@ run(function()
 		Darker = true
 	})
 end)
-
+	
+run(function()
+	local old
+	
+	vape.Categories.Combat:CreateModule({
+		Name = 'NoClickDelay',
+		Function = function(callback)
+			if callback then
+				old = bedwars.SwordController.isClickingTooFast
+				bedwars.SwordController.isClickingTooFast = function(self)
+					self.lastSwing = tick()
+					return false
+				end
+			else
+				bedwars.SwordController.isClickingTooFast = old
+			end
+		end,
+		Tooltip = 'Remove the CPS cap'
+	})
+end)
+	
+run(function()
+	local Value
+	
+	Reach = vape.Categories.Combat:CreateModule({
+		Name = 'Reach',
+		Function = function(callback)
+			bedwars.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE = callback and Value.Value + 2 or 14.4
+		end,
+		Tooltip = 'Extends attack reach'
+	})
+	Value = Reach:CreateSlider({
+		Name = 'Range',
+		Min = 0,
+		Max = 18,
+		Default = 18,
+		Function = function(val)
+			if Reach.Enabled then
+				bedwars.CombatConstant.RAYCAST_SWORD_CHARACTER_DISTANCE = val + 2
+			end
+		end,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
+end)
 	
 run(function()
 	local Sprint
@@ -3084,7 +3130,7 @@ run(function()
 							if distance > safeRange then
 								local newPosition = Vector3.new(
 									rootPart.Position.X,
-									ray.Position.Y + 0.1, 
+									ray.Position.Y + 0.1,
 									rootPart.Position.Z
 								)
 								rootPart.CFrame = CFrame.new(newPosition) * rootPart.CFrame.Rotation
@@ -3238,169 +3284,120 @@ run(function()
 		Default = true
 	})
 end)
-
+	
 run(function()
-    local ProjectileAura
-    local Targets
-    local Range
-    local List
-    local ToolCheck
-    local ToolList
-    local rayCheck = RaycastParams.new()
-    rayCheck.FilterType = Enum.RaycastFilterType.Include
-    local FireDelays = {}
-    local clients = {
-        ProjectileRemote = bedwars.ClientHandler:Get(bedwars.ProjectileRemote)
-    }
-
-    local function getAmmo(check, toolType)
-        for _, item in store.inventory.inventory.items do
-            if check.ammoItemTypes and table.find(check.ammoItemTypes, item.itemType) then
-                if not ToolCheck.Enabled or (toolType and table.find(ToolList.ListEnabled, toolType)) then
-                    return item.itemType
-                end
-            end
-        end
-        return nil
-    end
-
-    local function getProjectiles()
-        local items = {}
-        for _, item in store.inventory.inventory.items do
-            local meta = bedwars.ItemMeta[item.itemType]
-            local proj = meta and meta.projectileSource
-            local ammo = proj and getAmmo(proj, item.itemType)
-            if ammo and table.find(List.ListEnabled, ammo) then
-                table.insert(items, {
-                    item = item,
-                    ammo = ammo,
-                    projectile = proj.projectileType(ammo),
-                    meta = meta
-                })
-            end
-        end
-        return items
-    end
-
-    -- Add random aim variation for legitimacy
-    local function addAimVariation(position, variation)
-        return position + Vector3.new(
-            (math.random() - 0.5) * variation,
-            (math.random() - 0.5) * variation,
-            (math.random() - 0.5) * variation
-        )
-    end
-
-    ProjectileAura = vape.Categories.Blatant:CreateModule({
-        Name = 'ProjectileAura',
-        Function = function(callback)
-            if callback then
-                repeat
-                    task.wait(0.1)
-                    if entitylib.isAlive and (workspace:GetServerTimeNow() - bedwars.SwordController.lastAttack) > 0.5 then
-                        local ent = entitylib.EntityPosition({
-                            Part = 'RootPart',
-                            Range = Range.Value,
-                            Players = Targets.Players.Enabled,
-                            NPCs = Targets.NPCs.Enabled,
-                            Wallcheck = Targets.Walls.Enabled
-                        })
-
-                        if ent then
-                            local pos = entitylib.character.RootPart.Position
-                            for _, data in pairs(getProjectiles()) do
-                                if (FireDelays[data.item.itemType] or 0) < tick() then
-                                    local meta = bedwars.ProjectileMeta[data.projectile]
-                                    local projSpeed = meta.launchVelocity
-                                    local gravity = meta.gravitationalAcceleration or 196.2
-
-                                    -- Add variation to target position
-                                    local targetPos = addAimVariation(ent.RootPart.Position, 0.5)
-                                    local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, targetPos, ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight, ent.Jumping and 42.6 or nil, rayCheck)
-
-                                    if calc then
-                                        targetinfo.Targets[ent] = tick() + 1
-                                        local switched = switchItem(data.item.tool)
-
-                                        task.spawn(function()
-                                            -- Add slight aim variation
-                                            local aimPos = addAimVariation(calc, 0.3)
-                                            local dir = CFrame.lookAt(pos, aimPos).LookVector
-                                            local id = httpService:GenerateGUID(true)
-                                            local shootPosition = (CFrame.new(pos, aimPos) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))).Position
-
-                                            -- Create and fire projectile
-                                            bedwars.ProjectileController:createLocalProjectile(meta, data.ammo, data.projectile, shootPosition, id, dir * projSpeed, {drawDurationSeconds = 1})
-                                            local res = clients.ProjectileRemote:CallServerAsync(
-                                                data.item.tool,
-                                                data.ammo,
-                                                data.projectile,
-                                                shootPosition,
-                                                pos,
-                                                dir * projSpeed,
-                                                id,
-                                                {
-                                                    drawDurationSeconds = 1,
-                                                    shotId = httpService:GenerateGUID(false)
-                                                },
-                                                workspace:GetServerTimeNow() - 0.045
-                                            )
-
-                                            if not res then
-                                                FireDelays[data.item.itemType] = tick()
-                                            else
-                                                local shoot = data.meta.launchSound
-                                                shoot = shoot and shoot[math.random(1, #shoot)] or nil
-                                                if shoot then
-                                                    bedwars.SoundManager:playSound(shoot)
-                                                end
-                                            end
-                                        end)
-
-                                        FireDelays[data.item.itemType] = tick() + data.meta.fireDelaySec + (math.random() * 0.2)
-                                        if switched then
-                                            task.wait(0.05)
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                until not ProjectileAura.Enabled
-            end
-        end,
-        Tooltip = 'Shoots projectiles at nearby players'
-    })
-
-    Targets = ProjectileAura:CreateTargets({
-        Players = true,
-        Walls = true
-    })
-
-    List = ProjectileAura:CreateTextList({
-        Name = 'Projectiles',
-        Default = {'arrow', 'snowball'}
-    })
-
-    Range = ProjectileAura:CreateSlider({
-        Name = 'Range',
-        Min = 1,
-        Max = 50,
-        Default = 50,
-        Suffix = function(val)
-            return val == 1 and 'stud' or 'studs'
-        end
-    })
-
-    ToolCheck = ProjectileAura:CreateToggle({
-        Name = 'Tool Check',
-        Default = false
-    })
-
-    ToolList = ProjectileAura:CreateTextList({
-        Name = 'Tools',
-        Default = {'wood_bow', 'stone_bow'}
-    })
+	local ProjectileAura
+	local Targets
+	local Range
+	local List
+	local rayCheck = RaycastParams.new()
+	rayCheck.FilterType = Enum.RaycastFilterType.Include
+	local projectileRemote = {InvokeServer = function() end}
+	local FireDelays = {}
+	task.spawn(function()
+		projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
+	end)
+	
+	local function getAmmo(check)
+		for _, item in store.inventory.inventory.items do
+			if check.ammoItemTypes and table.find(check.ammoItemTypes, item.itemType) then
+				return item.itemType
+			end
+		end
+	end
+	
+	local function getProjectiles()
+		local items = {}
+		for _, item in store.inventory.inventory.items do
+			local proj = bedwars.ItemMeta[item.itemType].projectileSource
+			local ammo = proj and getAmmo(proj)
+			if ammo and table.find(List.ListEnabled, ammo) then
+				table.insert(items, {
+					item,
+					ammo,
+					proj.projectileType(ammo),
+					proj
+				})
+			end
+		end
+		return items
+	end
+	
+	ProjectileAura = vape.Categories.Blatant:CreateModule({
+		Name = 'ProjectileAura',
+		Function = function(callback)
+			if callback then
+				repeat
+					if (workspace:GetServerTimeNow() - bedwars.SwordController.lastAttack) > 0.5 then
+						local ent = entitylib.EntityPosition({
+							Part = 'RootPart',
+							Range = Range.Value,
+							Players = Targets.Players.Enabled,
+							NPCs = Targets.NPCs.Enabled,
+							Wallcheck = Targets.Walls.Enabled
+						})
+	
+						if ent then
+							local pos = entitylib.character.RootPart.Position
+							for _, data in getProjectiles() do
+								local item, ammo, projectile, itemMeta = unpack(data)
+								if (FireDelays[item.itemType] or 0) < tick() then
+									rayCheck.FilterDescendantsInstances = {workspace.Map}
+									local meta = bedwars.ProjectileMeta[projectile]
+									local projSpeed, gravity = meta.launchVelocity, meta.gravitationalAcceleration or 196.2
+									local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, ent.RootPart.Position, ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight, ent.Jumping and 42.6 or nil, rayCheck)
+									if calc then
+										targetinfo.Targets[ent] = tick() + 1
+										local switched = switchItem(item.tool)
+	
+										task.spawn(function()
+											local dir, id = CFrame.lookAt(pos, calc).LookVector, httpService:GenerateGUID(true)
+											local shootPosition = (CFrame.new(pos, calc) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))).Position
+											bedwars.ProjectileController:createLocalProjectile(meta, ammo, projectile, shootPosition, id, dir * projSpeed, {drawDurationSeconds = 1})
+											local res = projectileRemote:InvokeServer(item.tool, ammo, projectile, shootPosition, pos, dir * projSpeed, id, {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)}, workspace:GetServerTimeNow() - 0.045)
+											if not res then
+												FireDelays[item.itemType] = tick()
+											else
+												local shoot = itemMeta.launchSound
+												shoot = shoot and shoot[math.random(1, #shoot)] or nil
+												if shoot then
+													bedwars.SoundManager:playSound(shoot)
+												end
+											end
+										end)
+	
+										FireDelays[item.itemType] = tick() + itemMeta.fireDelaySec
+										if switched then
+											task.wait(0.05)
+										end
+									end
+								end
+							end
+						end
+					end
+					task.wait(0.1)
+				until not ProjectileAura.Enabled
+			end
+		end,
+		Tooltip = 'Shoots people around you'
+	})
+	Targets = ProjectileAura:CreateTargets({
+		Players = true,
+		Walls = true
+	})
+	List = ProjectileAura:CreateTextList({
+		Name = 'Projectiles',
+		Default = {'arrow', 'snowball'}
+	})
+	Range = ProjectileAura:CreateSlider({
+		Name = 'Range',
+		Min = 1,
+		Max = 50,
+		Default = 50,
+		Suffix = function(val)
+			return val == 1 and 'stud' or 'studs'
+		end
+	})
 end)
 	
 run(function()
@@ -3432,7 +3429,11 @@ run(function()
 						local moveDirection = AntiVoidDirection or entitylib.character.Humanoid.MoveDirection
 						local destination = (moveDirection * math.max(Value.Value - velo, 0) * dt)
 	
-											if ray then
+						if WallCheck.Enabled then
+							rayCheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
+							rayCheck.CollisionGroup = root.CollisionGroup
+							local ray = workspace:Raycast(root.Position, destination, rayCheck)
+							if ray then
 								destination = ((ray.Position + ray.Normal) - root.Position)
 							end
 						end
@@ -5123,309 +5124,180 @@ run(function()
 	})
 end)
 	
-local Scaffold
-local Expand
-local Tower
-local Downwards
-local Diagonal
-local LimitItem
-local Mouse
-local TowerCPS
-
--- Pre-calculate adjacent positions
-local adjacent = table.create(26)
-for x = -3, 3, 3 do
-    for y = -3, 3, 3 do
-        for z = -3, 3, 3 do
-            if x ~= 0 or y ~= 0 or z ~= 0 then
-                adjacent[#adjacent + 1] = Vector3.new(x, y, z)
-            end
-        end
-    end
-end
-
-local lastpos = Vector3.zero
-local label
-local lastPlace = 0
-
--- Optimized corner check using cached unit vectors
-local function nearCorner(poscheck, pos)
-    local offset = Vector3.new(3, 3, 3)
-    local startpos = poscheck - offset
-    local endpos = poscheck + offset
-    local dir = (pos - poscheck).Unit
-    local check = poscheck + dir * 100
-    return Vector3.new(
-        math.clamp(check.X, startpos.X, endpos.X),
-        math.clamp(check.Y, startpos.Y, endpos.Y),
-        math.clamp(check.Z, startpos.Z, endpos.Z)
-    )
-end
-
--- Optimized block proximity check with local caching
-local function blockProximity(pos)
-    local mag = 60
-    local returned
-    local startPos = bedwars.BlockController:getBlockPosition(pos - Vector3.new(15, 15, 15))
-    local endPos = bedwars.BlockController:getBlockPosition(pos + Vector3.new(15, 15, 15))
-    local blocks = getBlocksInPoints(startPos, endPos)
-    
-    for i = 1, #blocks do
-        local blockpos = nearCorner(blocks[i], pos)
-        local newmag = (pos - blockpos).Magnitude
-        if newmag < mag then
-            mag = newmag
-            returned = blockpos
-        end
-    end
-    table.clear(blocks)
-    return returned
-end
-
--- Optimized adjacent check
-local function checkAdjacent(pos)
-    for i = 1, #adjacent do
-        if getPlacedBlock(pos + adjacent[i]) then
-            return true
-        end
-    end
-    return false
-end
-
-local function getScaffoldBlock()
-    if store.hand.toolType == 'block' then
-        return store.hand.tool.Name, store.hand.amount
-    elseif not LimitItem.Enabled then
-        local wool, amount = getWool()
-        if wool then
-            return wool, amount
-        end
-        for _, item in store.inventory.inventory.items do
-            if bedwars.ItemMeta[item.itemType].block then
-                return item.itemType, item.amount
-            end
-        end
-    end
-    return nil, 0
-end
-
-Scaffold = vape.Categories.Utility:CreateModule({
-    Name = 'Scaffold',
-    Function = function(callback)
-        if label then
-            label.Visible = callback
-        end
-
-        if callback then
-            local towerThread
-            
-            -- Fast tower building with CPS
-            local function startTowerBuild()
-                if towerThread then return end
-                towerThread = task.spawn(function()
-                    local lastBlockPos = nil
-                    local lastJumpTime = 0
-                    while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or 
-                        (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)) do
-                        local currentTime = tick()
-                        if entitylib.isAlive then
-                            local root = entitylib.character.RootPart
-                            if root then
-                                local wool = getScaffoldBlock()
-                                -- Only apply velocity if we have blocks or LimitItem is off
-                                if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                    -- Adjust velocity based on block placement timing
-                                    if currentTime - lastJumpTime >= 0.1 then  -- Reduced delay between jumps
-                                        root.Velocity = Vector3.new(root.Velocity.X, 45, root.Velocity.Z)  -- Increased velocity
-                                        lastJumpTime = currentTime
-                                    end
-                                end
-                                
-                                -- Place blocks if we have them
-                                if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                    -- Place blocks slightly ahead of the player
-                                    local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 2, 0)
-                                    local roundedPos = roundPos(pos)
-                                    
-                                    -- Only do proximity check if position changed
-                                    if lastBlockPos ~= roundedPos and currentTime - lastPlace >= (1 / TowerCPS.GetRandomValue()) then
-                                        local block, blockpos = getPlacedBlock(roundedPos)
-                                        if not block then
-                                            blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(pos)
-                                            if blockpos then
-                                                task.spawn(bedwars.placeBlock, blockpos, wool, false)
-                                                lastPlace = currentTime
-                                                lastBlockPos = roundedPos
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                        task.wait(0.01)
-                    end
-                    towerThread = nil
-                end)
-            end
-            
-            local function stopTowerBuild()
-                if towerThread then
-                    task.cancel(towerThread)
-                    towerThread = nil
-                end
-            end
-            
-            -- Input handlers for tower
-            Scaffold:Clean(inputService.InputBegan:Connect(function(input)
-                if input.KeyCode == Enum.KeyCode.Space and Tower.Enabled then
-                    startTowerBuild()
-                end
-            end))
-            
-            Scaffold:Clean(inputService.InputEnded:Connect(function(input)
-                if input.KeyCode == Enum.KeyCode.Space then
-                    stopTowerBuild()
-                end
-            end))
-            
-            -- Mobile support
-            if inputService.TouchEnabled then
-                pcall(function()
-                    local touchGui = lplr.PlayerGui:WaitForChild("TouchGui", 2)
-                    if touchGui then
-                        local jumpButton = touchGui.TouchControlFrame:WaitForChild("JumpButton", 2)
-                        if jumpButton then
-                            Scaffold:Clean(jumpButton.MouseButton1Down:Connect(function()
-                                if Tower.Enabled then startTowerBuild() end
-                            end))
-                            Scaffold:Clean(jumpButton.MouseButton1Up:Connect(stopTowerBuild))
-                        end
-                    end
-                end)
-            end
-
-            -- Main scaffold loop
-            repeat
-                if entitylib.isAlive then
-                    local wool, amount = getScaffoldBlock()
-
-                    if Mouse.Enabled and not inputService:IsMouseButtonPressed(0) then
-                        wool = nil
-                    end
-
-                    if label then
-                        amount = amount or 0
-                        label.Text = amount..' <font color="rgb(170, 170, 170)">(Scaffold)</font>'
-                        label.TextColor3 = Color3.fromHSV((amount / 128) / 2.8, 0.86, 1)
-                    end
-
-                    if wool then
-                        local root = entitylib.character.RootPart
-                        local moveDir = entitylib.character.Humanoid.MoveDirection
-                        local hipHeight = entitylib.character.HipHeight
-                        local downOffset = Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5
-                        local basePos = root.Position - Vector3.new(0, hipHeight + downOffset, 0)
-
-                        -- Fast scaffold placement with batch processing
-                        local positions = {}
-                        for i = Expand.Value, 1, -1 do
-                            local currentpos = roundPos(basePos + moveDir * (i * 3))
-                            
-                            if Diagonal.Enabled then
-                                local angle = math.abs(math.round(math.deg(math.atan2(-moveDir.X, -moveDir.Z)) / 45) * 45)
-                                if angle % 90 == 45 then
-                                    local dt = (lastpos - currentpos)
-                                    if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and 
-                                       ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
-                                        currentpos = lastpos
-                                    end
-                                end
-                            end
-
-                            local block, blockpos = getPlacedBlock(currentpos)
-                            if not block then
-                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
-                                if blockpos then
-                                    table.insert(positions, blockpos)
-                                end
-                            end
-                            lastpos = currentpos
-                        end
-
-                        -- Place all blocks in rapid succession
-                        for _, pos in ipairs(positions) do
-                            task.spawn(bedwars.placeBlock, pos, wool, false)
-                        end
-                    end
-                end
-                task.wait(0.005)  -- Reduced wait time for faster updates
-            until not Scaffold.Enabled
-        else
-            Label = nil
-        end
-    end,
-    Tooltip = 'Helps you make bridges/scaffold walk.'
-})
-
-Expand = Scaffold:CreateSlider({
-    Name = 'Expand',
-    Min = 1,
-    Max = 6
-})
-
-Tower = Scaffold:CreateToggle({
-    Name = 'Tower',
-    Default = true
-})
-
-Downwards = Scaffold:CreateToggle({
-    Name = 'Downwards',
-    Default = true
-})
-
-Diagonal = Scaffold:CreateToggle({
-    Name = 'Diagonal',
-    Default = true
-})
-
-LimitItem = Scaffold:CreateToggle({Name = 'Limit to items'})
-Mouse = Scaffold:CreateToggle({Name = 'Require mouse down'})
-
-Count = Scaffold:CreateToggle({
-    Name = 'Block Count',
-    Function = function(callback)
-        if callback then
-            label = Instance.new('TextLabel')
-            label.Size = UDim2.fromOffset(100, 20)
-            label.Position = UDim2.new(0.5, 6, 0.5, 60)
-            label.BackgroundTransparency = 1
-            label.AnchorPoint = Vector2.new(0.5, 0)
-            label.Text = '0'
-            label.TextColor3 = Color3.new(0, 1, 0)
-            label.TextSize = 18
-            label.RichText = true
-            label.Font = Enum.Font.Arial
-            label.Visible = Scaffold.Enabled
-            label.Parent = vape.gui
-        else
-            label:Destroy()
-            label = nil
-        end
-    end
-})
-
-TowerCPS = Scaffold:CreateTwoSlider({
-    Name = 'Tower CPS',
-    Min = 1,
-    Max = 40,
-    DefaultMin = 20,
-    DefaultMax = 20,
-    Darker = true
-})
-
-
-                                                                                                                                                                                                                                                                                                                                                
-																																																																													
+run(function()
+	local Scaffold
+	local Expand
+	local Tower
+	local Downwards
+	local Diagonal
+	local LimitItem
+	local Mouse
+	local adjacent, lastpos, label = {}, Vector3.zero
+	
+	for x = -3, 3, 3 do
+		for y = -3, 3, 3 do
+			for z = -3, 3, 3 do
+				local vec = Vector3.new(x, y, z)
+				if vec ~= Vector3.zero then
+					table.insert(adjacent, vec)
+				end
+			end
+		end
+	end
+	
+	local function nearCorner(poscheck, pos)
+		local startpos = poscheck - Vector3.new(3, 3, 3)
+		local endpos = poscheck + Vector3.new(3, 3, 3)
+		local check = poscheck + (pos - poscheck).Unit * 100
+		return Vector3.new(math.clamp(check.X, startpos.X, endpos.X), math.clamp(check.Y, startpos.Y, endpos.Y), math.clamp(check.Z, startpos.Z, endpos.Z))
+	end
+	
+	local function blockProximity(pos)
+		local mag, returned = 60
+		local tab = getBlocksInPoints(bedwars.BlockController:getBlockPosition(pos - Vector3.new(21, 21, 21)), bedwars.BlockController:getBlockPosition(pos + Vector3.new(21, 21, 21)))
+		for _, v in tab do
+			local blockpos = nearCorner(v, pos)
+			local newmag = (pos - blockpos).Magnitude
+			if newmag < mag then
+				mag, returned = newmag, blockpos
+			end
+		end
+		table.clear(tab)
+		return returned
+	end
+	
+	local function checkAdjacent(pos)
+		for _, v in adjacent do
+			if getPlacedBlock(pos + v) then
+				return true
+			end
+		end
+		return false
+	end
+	
+	local function getScaffoldBlock()
+		if store.hand.toolType == 'block' then
+			return store.hand.tool.Name, store.hand.amount
+		elseif (not LimitItem.Enabled) then
+			local wool, amount = getWool()
+			if wool then
+				return wool, amount
+			else
+				for _, item in store.inventory.inventory.items do
+					if bedwars.ItemMeta[item.itemType].block then
+						return item.itemType, item.amount
+					end
+				end
+			end
+		end
+	
+		return nil, 0
+	end
+	
+	Scaffold = vape.Categories.Utility:CreateModule({
+		Name = 'Scaffold',
+		Function = function(callback)
+			if label then
+				label.Visible = callback
+			end
+	
+			if callback then
+				repeat
+					if entitylib.isAlive then
+						local wool, amount = getScaffoldBlock()
+	
+						if Mouse.Enabled then
+							if not inputService:IsMouseButtonPressed(0) then
+								wool = nil
+							end
+						end
+	
+						if label then
+							amount = amount or 0
+							label.Text = amount..' <font color="rgb(170, 170, 170)">(Scaffold)</font>'
+							label.TextColor3 = Color3.fromHSV((amount / 128) / 2.8, 0.86, 1)
+						end
+	
+						if wool then
+							local root = entitylib.character.RootPart
+							if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
+								root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+							end
+	
+							for i = Expand.Value, 1, -1 do
+								local currentpos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0) + entitylib.character.Humanoid.MoveDirection * (i * 3))
+								if Diagonal.Enabled then
+									if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
+										local dt = (lastpos - currentpos)
+										if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
+											currentpos = lastpos
+										end
+									end
+								end
+	
+								local block, blockpos = getPlacedBlock(currentpos)
+								if not block then
+									blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
+									if blockpos then
+										task.spawn(bedwars.placeBlock, blockpos, wool, false)
+									end
+								end
+								lastpos = currentpos
+							end
+						end
+					end
+	
+					task.wait(0.03)
+				until not Scaffold.Enabled
+			else
+				Label = nil
+			end
+		end,
+		Tooltip = 'Helps you make bridges/scaffold walk.'
+	})
+	Expand = Scaffold:CreateSlider({
+		Name = 'Expand',
+		Min = 1,
+		Max = 6
+	})
+	Tower = Scaffold:CreateToggle({
+		Name = 'Tower',
+		Default = true
+	})
+	Downwards = Scaffold:CreateToggle({
+		Name = 'Downwards',
+		Default = true
+	})
+	Diagonal = Scaffold:CreateToggle({
+		Name = 'Diagonal',
+		Default = true
+	})
+	LimitItem = Scaffold:CreateToggle({Name = 'Limit to items'})
+	Mouse = Scaffold:CreateToggle({Name = 'Require mouse down'})
+	Count = Scaffold:CreateToggle({
+		Name = 'Block Count',
+		Function = function(callback)
+			if callback then
+				label = Instance.new('TextLabel')
+				label.Size = UDim2.fromOffset(100, 20)
+				label.Position = UDim2.new(0.5, 6, 0.5, 60)
+				label.BackgroundTransparency = 1
+				label.AnchorPoint = Vector2.new(0.5, 0)
+				label.Text = '0'
+				label.TextColor3 = Color3.new(0, 1, 0)
+				label.TextSize = 18
+				label.RichText = true
+				label.Font = Enum.Font.Arial
+				label.Visible = Scaffold.Enabled
+				label.Parent = vape.gui
+			else
+				label:Destroy()
+				label = nil
+			end
+		end
+	})
+end)
+	
 run(function()
 	local ShopTierBypass
 	local tiered, nexttier = {}, {}
