@@ -7625,21 +7625,6 @@ run(function()
 		Name = 'Breaker',
 		Function = function(callback)
 			if callback then
-				-- Initialize AutoTool event
-				if AutoTool.Enabled then
-					event = Instance.new('BindableEvent')
-					Breaker:Clean(event)
-					Breaker:Clean(event.Event:Connect(function()
-						contextActionService:CallFunction('block-break', Enum.UserInputState.Begin, newproxy(true))
-					end))
-					old = bedwars.BlockBreaker.hitBlock
-					bedwars.BlockBreaker.hitBlock = function(self, maid, raycastparams, ...)
-						local block = self.clientManager:getBlockSelector():getMouseInfo(1, {ray = raycastparams})
-						if switchHotbarItem(block and block.target and block.target.blockInstance or nil) then return end
-						return old(self, maid, raycastparams, ...)
-					end
-				end
-				
 				for _ = 1, 30 do
 					local part = Instance.new('Part')
 					part.Anchored = true
@@ -7683,16 +7668,6 @@ run(function()
 					end
 				until not Breaker.Enabled
 			else
-				-- Cleanup AutoTool
-				if old then
-					bedwars.BlockBreaker.hitBlock = old
-					old = nil
-				end
-				if event then
-					event:Destroy()
-					event = nil
-				end
-				
 				for _, v in parts do
 					v:ClearAllChildren()
 					v:Destroy()
@@ -7763,15 +7738,13 @@ run(function()
 		Name = 'Limit to items',
 		Tooltip = 'Only breaks when tools are held'
 	})
-	AutoTool = Breaker:CreateToggle({
+	AutoTool = vape.Categories.Utility:CreateModule({
 		Name = 'Auto Tool',
-		Default = true,
-		Tooltip = 'Automatically switches to the fastest tool for breaking',
 		Function = function(callback)
 			if callback then
 				event = Instance.new('BindableEvent')
-				Breaker:Clean(event)
-				Breaker:Clean(event.Event:Connect(function()
+				AutoTool:Clean(event)
+				AutoTool:Clean(event.Event:Connect(function()
 					contextActionService:CallFunction('block-break', Enum.UserInputState.Begin, newproxy(true))
 				end))
 				old = bedwars.BlockBreaker.hitBlock
@@ -7788,7 +7761,8 @@ run(function()
 					event = nil
 				end
 			end
-		end
+		end,
+		Tooltip = 'Automatically switches to the fastest tool for breaking'
 	})
 end)
 	
