@@ -7463,6 +7463,26 @@ run(function()
 	local LimitItem
 	local AutoTool
 	local customlist, parts = {}, {}
+	local old, event
+	
+	-- AutoTool switch function from provided script
+	local function switchHotbarItem(block)
+		if block and not block:GetAttribute('NoBreak') and not block:GetAttribute('Team'..(lplr:GetAttribute('Team') or 0)..'NoBreak') then
+			local tool, slot = store.tools[bedwars.ItemMeta[block.Name].block.breakType], nil
+			if tool then
+				for i, v in store.inventory.hotbar do
+					if v.item and v.item.itemType == tool.itemType then slot = i - 1 break end
+				end
+	
+				if hotbarSwitch(slot) then
+					if inputService:IsMouseButtonPressed(0) then 
+						event:Fire() 
+					end
+					return true
+				end
+			end
+		end
+	end
 	
 	local function customHealthbar(self, blockRef, health, maxHealth, changeHealth, block)
 		if block:GetAttribute('NoHealthbar') then return end
@@ -7566,38 +7586,6 @@ run(function()
 	
 	local hit = 0
 	
-	local function switchToBestTool(block)
-		if not block or block:GetAttribute('NoBreak') or block:GetAttribute('Team'..(lplr:GetAttribute('Team') or 0)..'NoBreak') then
-			return false
-		end
-		
-		local blockMeta = bedwars.ItemMeta[block.Name]
-		if not blockMeta or not blockMeta.block or not blockMeta.block.breakType then
-			return false
-		end
-		
-		local bestTool = store.tools[blockMeta.block.breakType]
-		if not bestTool then
-			return false
-		end
-		
-		-- Find the slot with the best tool
-		local bestSlot = nil
-		for i, v in store.inventory.hotbar do
-			if v.item and v.item.itemType == bestTool.itemType then 
-				bestSlot = i - 1
-				break 
-			end
-		end
-		
-		-- Switch to the best tool if found
-		if bestSlot then
-			return hotbarSwitch(bestSlot)
-		end
-		
-		return false
-	end
-	
 	local function attemptBreak(tab, localPosition)
 		if not tab then return end
 		for _, v in tab do
@@ -7606,9 +7594,9 @@ run(function()
 				if (v:GetAttribute('BedShieldEndTime') or 0) > workspace:GetServerTimeNow() then continue end
 				if LimitItem.Enabled and not (store.hand.tool and bedwars.ItemMeta[store.hand.tool.Name].breakBlock) then continue end
 				
-				-- Try to switch to best tool if AutoTool is enabled
+				-- Use AutoTool switch function
 				if AutoTool.Enabled then
-					switchToBestTool(v)
+					switchHotbarItem(v)
 				end
 	
 				hit += 1
@@ -7637,6 +7625,21 @@ run(function()
 		Name = 'Breaker',
 		Function = function(callback)
 			if callback then
+				-- Initialize AutoTool event
+				if AutoTool.Enabled then
+					event = Instance.new('BindableEvent')
+					Breaker:Clean(event)
+					Breaker:Clean(event.Event:Connect(function()
+						contextActionService:CallFunction('block-break', Enum.UserInputState.Begin, newproxy(true))
+					end))
+					old = bedwars.BlockBreaker.hitBlock
+					bedwars.BlockBreaker.hitBlock = function(self, maid, raycastparams, ...)
+						local block = self.clientManager:getBlockSelector():getMouseInfo(1, {ray = raycastparams})
+						if switchHotbarItem(block and block.target and block.target.blockInstance or nil) then return end
+						return old(self, maid, raycastparams, ...)
+					end
+				end
+				
 				for _ = 1, 30 do
 					local part = Instance.new('Part')
 					part.Anchored = true
@@ -7680,6 +7683,16 @@ run(function()
 					end
 				until not Breaker.Enabled
 			else
+				-- Cleanup AutoTool
+				if old then
+					bedwars.BlockBreaker.hitBlock = old
+					old = nil
+				end
+				if event then
+					event:Destroy()
+					event = nil
+				end
+				
 				for _, v in parts do
 					v:ClearAllChildren()
 					v:Destroy()
@@ -7753,7 +7766,29 @@ run(function()
 	AutoTool = Breaker:CreateToggle({
 		Name = 'Auto Tool',
 		Default = true,
-		Tooltip = 'Automatically switches to the fastest tool for breaking'
+		Tooltip = 'Automatically switches to the fastest tool for breaking',
+		Function = function(callback)
+			if callback then
+				event = Instance.new('BindableEvent')
+				Breaker:Clean(event)
+				Breaker:Clean(event.Event:Connect(function()
+					contextActionService:CallFunction('block-break', Enum.UserInputState.Begin, newproxy(true))
+				end))
+				old = bedwars.BlockBreaker.hitBlock
+				bedwars.BlockBreaker.hitBlock = function(self, maid, raycastparams, ...)
+					local block = self.clientManager:getBlockSelector():getMouseInfo(1, {ray = raycastparams})
+					if switchHotbarItem(block and block.target and block.target.blockInstance or nil) then return end
+					return old(self, maid, raycastparams, ...)
+				end
+			else
+				bedwars.BlockBreaker.hitBlock = old
+				old = nil
+				if event then
+					event:Destroy()
+					event = nil
+				end
+			end
+		end
 	})
 end)
 	
