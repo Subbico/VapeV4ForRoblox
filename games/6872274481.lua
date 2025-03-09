@@ -5152,7 +5152,6 @@ local Diagonal
 local LimitItem
 local Mouse
 local Speed
-local Height
 local label
 
 -- Pre-calculate adjacent positions
@@ -5168,6 +5167,7 @@ for x = -3, 3, 3 do
 end
 
 local lastpos = Vector3.zero
+local thread
 
 -- Block proximity check
 local function blockProximity(pos)
@@ -5211,6 +5211,30 @@ local function getScaffoldBlock()
     return nil, 0
 end
 
+local function startInfiniteJump()
+    if thread then
+        task.cancel(thread)
+    end
+    
+    thread = task.spawn(function()
+        local lastJump = 0
+        while Scaffold.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) do
+            local currentTime = tick()
+            if currentTime - lastJump >= 0.01 then
+                if entitylib.isAlive then
+                    local root = entitylib.character.RootPart
+                    if root then
+                        root.Velocity = Vector3.new(root.Velocity.X, Speed.GetRandomValue(), root.Velocity.Z)
+                        lastJump = currentTime
+                    end
+                end
+            end
+            task.wait()
+        end
+        thread = nil
+    end)
+end
+
 Scaffold = vape.Categories.Utility:CreateModule({
     Name = 'Scaffold',
     Function = function(callback)
@@ -5219,6 +5243,13 @@ Scaffold = vape.Categories.Utility:CreateModule({
         end
 
         if callback then
+            -- Setup infinite jump
+            Scaffold:Clean(inputService.InputBegan:Connect(function(input)
+                if input.KeyCode == Enum.KeyCode.Space then
+                    startInfiniteJump()
+                end
+            end))
+
             repeat
                 if entitylib.isAlive then
                     local wool, amount = getScaffoldBlock()
@@ -5237,13 +5268,8 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         local root = entitylib.character.RootPart
                         local moveDir = entitylib.character.Humanoid.MoveDirection
                         local hipHeight = entitylib.character.HipHeight
-                        local downOffset = Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or Height.GetRandomValue()
+                        local downOffset = Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 2
                         local basePos = root.Position - Vector3.new(0, hipHeight + downOffset, 0)
-
-                        -- Apply enhanced velocity when jumping
-                        if inputService:IsKeyDown(Enum.KeyCode.Space) then
-                            root.Velocity = Vector3.new(root.Velocity.X, Speed.GetRandomValue(), root.Velocity.Z)
-                        end
 
                         for i = Expand.Value, 1, -1 do
                             local currentpos = roundPos(basePos + moveDir * (i * 3))
@@ -5263,20 +5289,22 @@ Scaffold = vape.Categories.Utility:CreateModule({
                             if not block then
                                 blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
                                 if blockpos then
-                                    task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                    bedwars.placeBlock(blockpos, wool)
                                 end
                             end
                             lastpos = currentpos
                         end
                     end
                 end
-                task.wait(0.01)  -- Reduced wait time for faster response
             until not Scaffold.Enabled
-        else
-            label = nil
+
+            if thread then
+                task.cancel(thread)
+                thread = nil
+            end
         end
     end,
-    Tooltip = 'Enhanced scaffold with fast tower capabilities'
+    Tooltip = 'Enhanced scaffold with infinite jump'
 })
 
 Expand = Scaffold:CreateSlider({
@@ -5298,17 +5326,9 @@ Diagonal = Scaffold:CreateToggle({
 Speed = Scaffold:CreateTwoSlider({
     Name = 'Jump Speed',
     Min = 38,
-    Max = 50,
-    DefaultMin = 42,
-    DefaultMax = 45
-})
-
-Height = Scaffold:CreateTwoSlider({
-    Name = 'Place Height',
-    Min = 2,
-    Max = 4,
-    DefaultMin = 2.5,
-    DefaultMax = 3
+    Max = 60,
+    DefaultMin = 50,
+    DefaultMax = 55
 })
 
 LimitItem = Scaffold:CreateToggle({Name = 'Limit to items'})
