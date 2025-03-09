@@ -5151,6 +5151,7 @@ local Downwards
 local Diagonal
 local LimitItem
 local Mouse
+local Speed
 local label
 
 -- Pre-calculate adjacent positions
@@ -5166,7 +5167,6 @@ for x = -3, 3, 3 do
 end
 
 local lastpos = Vector3.zero
-local thread
 
 -- Block proximity check
 local function blockProximity(pos)
@@ -5210,24 +5210,6 @@ local function getScaffoldBlock()
     return nil, 0
 end
 
-local function startInfiniteJump()
-    if thread then return end
-    thread = task.spawn(function()
-        while task.wait() do
-            if not (Scaffold.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space)) then
-                break
-            end
-            if entitylib.isAlive then
-                local root = entitylib.character.RootPart
-                if root then
-                    root.Velocity = Vector3.new(root.Velocity.X, 45, root.Velocity.Z)
-                end
-            end
-        end
-        thread = nil
-    end)
-end
-
 Scaffold = vape.Categories.Utility:CreateModule({
     Name = 'Scaffold',
     Function = function(callback)
@@ -5237,11 +5219,44 @@ Scaffold = vape.Categories.Utility:CreateModule({
 
         if callback then
             -- Setup infinite jump
-            Scaffold:Clean(inputService.InputBegan:Connect(function(input)
-                if input.KeyCode == Enum.KeyCode.Space then
-                    startInfiniteJump()
+            local function setupInfiniteJump()
+                local character = playersService.LocalPlayer.Character
+                if not character then return end
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if not humanoidRootPart then return end
+
+                Scaffold:Clean(inputService.InputBegan:Connect(function(input, gameProcessed)
+                    if gameProcessed then return end
+                    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.Space then
+                        while inputService:IsKeyDown(Enum.KeyCode.Space) do
+                            humanoidRootPart.Velocity = Vector3.new(humanoidRootPart.Velocity.X, Speed.Value, humanoidRootPart.Velocity.Z)
+                            task.wait()
+                        end
+                    end
+                end))
+
+                if inputService.TouchEnabled then
+                    local Jumping = false
+                    local JumpButton = lplr.PlayerGui:WaitForChild("TouchGui"):WaitForChild("TouchControlFrame"):WaitForChild("JumpButton")
+                    
+                    Scaffold:Clean(JumpButton.MouseButton1Down:Connect(function()
+                        Jumping = true
+                    end))
+
+                    Scaffold:Clean(JumpButton.MouseButton1Up:Connect(function()
+                        Jumping = false
+                    end))
+
+                    Scaffold:Clean(runService.RenderStepped:Connect(function()
+                        if Jumping then
+                            humanoidRootPart.Velocity = Vector3.new(humanoidRootPart.Velocity.X, Speed.Value, humanoidRootPart.Velocity.Z)
+                        end
+                    end))
                 end
-            end))
+            end
+
+            setupInfiniteJump()
+            Scaffold:Clean(playersService.LocalPlayer.CharacterAdded:Connect(setupInfiniteJump))
 
             repeat
                 if entitylib.isAlive then
@@ -5282,7 +5297,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                             if not block then
                                 blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
                                 if blockpos then
-                                    task.spawn(bedwars.placeBlock, blockpos, wool)
+                                    bedwars.placeBlock(blockpos, wool)
                                 end
                             end
                             lastpos = currentpos
@@ -5291,11 +5306,6 @@ Scaffold = vape.Categories.Utility:CreateModule({
                 end
                 task.wait()
             until not Scaffold.Enabled
-
-            if thread then
-                task.cancel(thread)
-                thread = nil
-            end
         end
     end,
     Tooltip = 'Enhanced scaffold with infinite jump'
@@ -5305,6 +5315,13 @@ Expand = Scaffold:CreateSlider({
     Name = 'Expand',
     Min = 1,
     Max = 6
+})
+
+Speed = Scaffold:CreateSlider({
+    Name = 'Jump Speed',
+    Min = 20,
+    Max = 50,
+    Default = 45
 })
 
 Downwards = Scaffold:CreateToggle({
@@ -5342,6 +5359,7 @@ Count = Scaffold:CreateToggle({
         end
     end
 })
+
 	
 run(function()
 	local ShopTierBypass
