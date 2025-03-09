@@ -3238,8 +3238,9 @@ run(function()
 		Default = true
 	})
 end)
-	
-local ProjectileAura
+
+run(function()	
+        local ProjectileAura
 	local Targets
 	local Range
 	local List
