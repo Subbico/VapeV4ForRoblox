@@ -7461,6 +7461,7 @@ run(function()
 	local SelfBreak
 	local InstantBreak
 	local LimitItem
+	local AutoTool
 	local customlist, parts = {}, {}
 	
 	local function customHealthbar(self, blockRef, health, maxHealth, changeHealth, block)
@@ -7565,6 +7566,38 @@ run(function()
 	
 	local hit = 0
 	
+	local function switchToBestTool(block)
+		if not block or block:GetAttribute('NoBreak') or block:GetAttribute('Team'..(lplr:GetAttribute('Team') or 0)..'NoBreak') then
+			return false
+		end
+		
+		local blockMeta = bedwars.ItemMeta[block.Name]
+		if not blockMeta or not blockMeta.block or not blockMeta.block.breakType then
+			return false
+		end
+		
+		local bestTool = store.tools[blockMeta.block.breakType]
+		if not bestTool then
+			return false
+		end
+		
+		-- Find the slot with the best tool
+		local bestSlot = nil
+		for i, v in store.inventory.hotbar do
+			if v.item and v.item.itemType == bestTool.itemType then 
+				bestSlot = i - 1
+				break 
+			end
+		end
+		
+		-- Switch to the best tool if found
+		if bestSlot then
+			return hotbarSwitch(bestSlot)
+		end
+		
+		return false
+	end
+	
 	local function attemptBreak(tab, localPosition)
 		if not tab then return end
 		for _, v in tab do
@@ -7572,6 +7605,11 @@ run(function()
 				if not SelfBreak.Enabled and v:GetAttribute('PlacedByUserId') == lplr.UserId then continue end
 				if (v:GetAttribute('BedShieldEndTime') or 0) > workspace:GetServerTimeNow() then continue end
 				if LimitItem.Enabled and not (store.hand.tool and bedwars.ItemMeta[store.hand.tool.Name].breakBlock) then continue end
+				
+				-- Try to switch to best tool if AutoTool is enabled
+				if AutoTool.Enabled then
+					switchToBestTool(v)
+				end
 	
 				hit += 1
 				local target, path, endpos = bedwars.breakBlock(v, Effect.Enabled, Animation.Enabled, CustomHealth.Enabled and customHealthbar or nil, InstantBreak.Enabled)
@@ -7711,6 +7749,11 @@ run(function()
 	LimitItem = Breaker:CreateToggle({
 		Name = 'Limit to items',
 		Tooltip = 'Only breaks when tools are held'
+	})
+	AutoTool = Breaker:CreateToggle({
+		Name = 'Auto Tool',
+		Default = true,
+		Tooltip = 'Automatically switches to the fastest tool for breaking'
 	})
 end)
 	
