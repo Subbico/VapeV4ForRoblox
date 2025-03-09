@@ -3239,148 +3239,187 @@ run(function()
 	})
 end)
 	
-run(function()
-	local ProjectileAura
-	local Targets
-	local Range
-	local ProjectileList -- First tab: List of allowed projectiles
-	local ToolProjectileList -- Second tab: List of tool(projectile) pairs
-	local rayCheck = RaycastParams.new()
-	rayCheck.FilterType = Enum.RaycastFilterType.Include
-	local projectileRemote = {InvokeServer = function() end}
-	local FireDelays = {}
-	task.spawn(function()
-		projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
-	end)
+local ProjectileAura
+local Targets
+local Range
+local List
+local ToolCheck
+local rayCheck = RaycastParams.new()
+rayCheck.FilterType = Enum.RaycastFilterType.Include
+local projectileRemote = {InvokeServer = function() end}
+local FireDelays = {}
+local toolProjectileMap = {}  -- Maps tools to their allowed projectiles
 
-	-- Function to parse tool and projectile from input (e.g., "bow(arrow)")
-	local function parseToolProjectile(input)
-		local tool, projectile = input:match("([%w_]+)%(([%w_]+)%)")
-		return tool, projectile
-	end
-
-	-- Function to check if the player has the specified tool and projectile
-	local function hasToolAndProjectile(toolName, projectileName)
-		local hasTool = false
-		local hasProjectile = false
-		for _, item in store.inventory.inventory.items do
-			if item.itemType == toolName then
-				hasTool = true
-			end
-			if item.itemType == projectileName then
-				hasProjectile = true
-			end
-		end
-		return hasTool and hasProjectile
-	end
-
-	-- Function to check if the projectile is allowed (from the first tab)
-	local function isProjectileAllowed(projectileName)
-		for _, allowedProjectile in ProjectileList.ListEnabled do
-			if allowedProjectile == projectileName then
-				return true
-			end
-		end
-		return false
-	end
-
-	-- Function to get the currently held tool
-	local function getHeldTool()
-		return store.tools[store.selectedTool]
-	end
-
-	ProjectileAura = vape.Categories.Blatant:CreateModule({
-		Name = 'ProjectileAura',
-		Function = function(callback)
-			if callback then
-				repeat
-					-- Check if the player has the specified tool and projectile
-					local canShoot = false
-					local toolToUse, projectileToUse
-					for _, entry in ToolProjectileList.ListEnabled do
-						local tool, projectile = parseToolProjectile(entry)
-						if hasToolAndProjectile(tool, projectile) and isProjectileAllowed(projectile) then
-							canShoot = true
-							toolToUse = tool
-							projectileToUse = projectile
-							break
-						end
-					end
-
-					-- Check if the player is holding the specified tool
-					local heldTool = getHeldTool()
-					if canShoot and heldTool and heldTool.itemType == toolToUse and (workspace:GetServerTimeNow() - bedwars.SwordController.lastAttack) > 0.5 then
-						local ent = entitylib.EntityPosition({
-							Part = 'RootPart',
-							Range = Range.Value,
-							Players = Targets.Players.Enabled,
-							NPCs = Targets.NPCs.Enabled,
-							Wallcheck = Targets.Walls.Enabled
-						})
-
-						if ent then
-							local pos = entitylib.character.RootPart.Position
-							rayCheck.FilterDescendantsInstances = {workspace.Map}
-							local meta = bedwars.ProjectileMeta[projectileToUse]
-							local projSpeed, gravity = meta.launchVelocity, meta.gravitationalAcceleration or 196.2
-							local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, ent.RootPart.Position, ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight, ent.Jumping and 42.6 or nil, rayCheck)
-							if calc then
-								targetinfo.Targets[ent] = tick() + 1
-
-								task.spawn(function()
-									local dir, id = CFrame.lookAt(pos, calc).LookVector, httpService:GenerateGUID(true)
-									local shootPosition = (CFrame.new(pos, calc) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))).Position
-									bedwars.ProjectileController:createLocalProjectile(meta, projectileToUse, projectileToUse, shootPosition, id, dir * projSpeed, {drawDurationSeconds = 1})
-									local res = projectileRemote:InvokeServer(heldTool.tool, projectileToUse, projectileToUse, shootPosition, pos, dir * projSpeed, id, {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)}, workspace:GetServerTimeNow() - 0.045)
-									if not res then
-										FireDelays[heldTool.itemType] = tick()
-									else
-										local shoot = meta.launchSound
-										shoot = shoot and shoot[math.random(1, #shoot)] or nil
-										if shoot then
-											bedwars.SoundManager:playSound(shoot)
-										end
-									end
-								end)
-
-								FireDelays[heldTool.itemType] = tick() + meta.fireDelaySec
-							end
-						end
-					end
-					task.wait(0.1)
-				until not ProjectileAura.Enabled
-			end
-		end,
-		Tooltip = 'Automatically shoots projectiles at targets when you have the specified tool and projectile.'
-	})
-
-	Targets = ProjectileAura:CreateTargets({
-		Players = true,
-		Walls = true
-	})
-
-	-- First Tab: List of allowed projectiles
-	ProjectileList = ProjectileAura:CreateTextList({
-		Name = 'Projectiles',
-		Default = {'arrow', 'snowball'}
-	})
-
-	-- Second Tab: List of tool(projectile) pairs
-	ToolProjectileList = ProjectileAura:CreateTextList({
-		Name = 'Tool(Projectile)',
-		Default = {'bow(arrow)', 'snowball_launcher(snowball)'}
-	})
-
-	Range = ProjectileAura:CreateSlider({
-		Name = 'Range',
-		Min = 1,
-		Max = 50,
-		Default = 50,
-		Suffix = function(val)
-			return val == 1 and 'stud' or 'studs'
-		end
-	})
+task.spawn(function()
+    projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
 end)
+
+-- Get ammo with tool check support
+local function getAmmo(check, toolType)
+    for _, item in store.inventory.inventory.items do
+        if check.ammoItemTypes and table.find(check.ammoItemTypes, item.itemType) then
+            -- Check if this ammo is allowed for the current tool
+            if not ToolCheck.Enabled or (toolProjectileMap[toolType] and table.find(toolProjectileMap[toolType], item.itemType)) then
+                return item.itemType
+            end
+        end
+    end
+end
+
+local function getProjectiles()
+    local items = {}
+    for _, item in store.inventory.inventory.items do
+        local proj = bedwars.ItemMeta[item.itemType].projectileSource
+        local ammo = proj and getAmmo(proj, item.itemType)
+        if ammo and table.find(List.ListEnabled, ammo) then
+            table.insert(items, {
+                item,
+                ammo,
+                proj.projectileType(ammo),
+                proj
+            })
+        end
+    end
+    return items
+end
+
+-- Add random aim variation for legitimacy
+local function addAimVariation(position, variation)
+    local randomX = (math.random() - 0.5) * variation
+    local randomY = (math.random() - 0.5) * variation
+    local randomZ = (math.random() - 0.5) * variation
+    return position + Vector3.new(randomX, randomY, randomZ)
+end
+
+-- Simulate human-like aiming delay
+local function simulateAimDelay()
+    local baseDelay = 0.1 + (math.random() * 0.15)  -- 100-250ms base delay
+    task.wait(baseDelay)
+end
+
+ProjectileAura = vape.Categories.Combat:CreateModule({  -- Changed to Combat category for less blatant appearance
+    Name = 'ProjectileAura',
+    Function = function(callback)
+        if callback then
+            repeat
+                if (workspace:GetServerTimeNow() - bedwars.SwordController.lastAttack) > 0.5 then
+                    local ent = entitylib.EntityPosition({
+                        Part = 'RootPart',
+                        Range = Range.Value,
+                        Players = Targets.Players.Enabled,
+                        NPCs = Targets.NPCs.Enabled,
+                        Wallcheck = Targets.Walls.Enabled
+                    })
+
+                    if ent then
+                        local pos = entitylib.character.RootPart.Position
+                        for _, data in getProjectiles() do
+                            local item, ammo, projectile, itemMeta = unpack(data)
+                            if (FireDelays[item.itemType] or 0) < tick() then
+                                rayCheck.FilterDescendantsInstances = {workspace.Map}
+                                local meta = bedwars.ProjectileMeta[projectile]
+                                local projSpeed, gravity = meta.launchVelocity, meta.gravitationalAcceleration or 196.2
+                                
+                                -- Add slight aim variation for legitimacy
+                                local targetPos = addAimVariation(ent.RootPart.Position, 0.5)
+                                
+                                local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, targetPos, ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight, ent.Jumping and 42.6 or nil, rayCheck)
+                                if calc then
+                                    targetinfo.Targets[ent] = tick() + 1
+                                    local switched = switchItem(item.tool)
+                                    
+                                    -- Add human-like delay if we switched items
+                                    if switched then
+                                        simulateAimDelay()
+                                    end
+
+                                    task.spawn(function()
+                                        -- Add slight randomization to aim
+                                        local aimPos = addAimVariation(calc, 0.3)
+                                        local dir, id = CFrame.lookAt(pos, aimPos).LookVector, httpService:GenerateGUID(true)
+                                        local shootPosition = (CFrame.new(pos, aimPos) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))).Position
+                                        
+                                        -- Try to play animation if available
+                                        local anim = itemMeta.projectileShootAnimation
+                                        if anim then
+                                            local animator = entitylib.character.Humanoid:WaitForChild("Animator")
+                                            if animator then
+                                                local animation = Instance.new("Animation")
+                                                animation.AnimationId = anim
+                                                local animTrack = animator:LoadAnimation(animation)
+                                                animTrack:Play()
+                                            end
+                                        end
+
+                                        bedwars.ProjectileController:createLocalProjectile(meta, ammo, projectile, shootPosition, id, dir * projSpeed, {drawDurationSeconds = 1})
+                                        local res = projectileRemote:InvokeServer(item.tool, ammo, projectile, shootPosition, pos, dir * projSpeed, id, {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)}, workspace:GetServerTimeNow() - 0.045)
+                                        
+                                        if not res then
+                                            FireDelays[item.itemType] = tick()
+                                        else
+                                            local shoot = itemMeta.launchSound
+                                            shoot = shoot and shoot[math.random(1, #shoot)] or nil
+                                            if shoot then
+                                                bedwars.SoundManager:playSound(shoot)
+                                            end
+                                        end
+                                    end)
+
+                                    -- Add random delay between shots for legitimacy
+                                    FireDelays[item.itemType] = tick() + itemMeta.fireDelaySec + (math.random() * 0.2)
+                                end
+                            end
+                        end
+                    end
+                end
+                task.wait(0.1)
+            until not ProjectileAura.Enabled
+        end
+    end,
+    Tooltip = 'Automatically uses projectiles on nearby players'
+})
+
+Targets = ProjectileAura:CreateTargets({
+    Players = true,
+    Walls = true
+})
+
+-- Tool check list format: "tool:projectile1,projectile2"
+ToolCheck = ProjectileAura:CreateToggle({
+    Name = 'Tool Check',
+    Function = function(callback)
+        if callback then
+            toolProjectileMap = {}
+            for _, entry in pairs(List.ListEnabled) do
+                if entry:find(":") then
+                    local tool, projectiles = entry:match("(.+):(.+)")
+                    if tool and projectiles then
+                        toolProjectileMap[tool] = {}
+                        for proj in projectiles:gmatch("[^,]+") do
+                            table.insert(toolProjectileMap[tool], proj:trim())
+                        end
+                    end
+                end
+            end
+        end
+    end
+})
+
+List = ProjectileAura:CreateTextList({
+    Name = 'Projectiles',
+    Default = {'arrow', 'snowball', 'bow:arrow', 'snowball_launcher:snowball'}  -- Example format for tool checking
+})
+
+Range = ProjectileAura:CreateSlider({
+    Name = 'Range',
+    Min = 1,
+    Max = 50,
+    Default = 30,  -- Reduced default range for less blatant behavior
+    Suffix = function(val)
+        return val == 1 and 'stud' or 'studs'
+    end
+})
+
 	
 run(function()
 	local Speed
