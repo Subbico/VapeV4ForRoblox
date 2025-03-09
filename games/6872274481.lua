@@ -3298,9 +3298,25 @@ run(function()
     local clients = {
         ProjectileRemote = bedwars.ClientHandler:Get(bedwars.ProjectileRemote)
     }
+    
+    local store = bedwars.ClientStoreHandler:getState()
+    local entitylib = shared.vapeentity
+    local httpService = game:GetService("HttpService")
+
+    -- Utility function to switch items
+    local function switchItem(tool)
+        local switched = false
+        if store.Inventory.observedInventory.hand ~= tool then
+            bedwars.ClientHandler:Get(bedwars.EquipItemRemote):CallServerAsync({
+                hand = tool
+            })
+            switched = true
+        end
+        return switched
+    end
 
     local function getAmmo(check, toolType)
-        for _, item in store.inventory.inventory.items do
+        for _, item in pairs(store.Inventory.observedInventory.inventory.items) do
             if check.ammoItemTypes and table.find(check.ammoItemTypes, item.itemType) then
                 if not ToolCheck.Enabled or (toolType and table.find(ToolList.ListEnabled, toolType)) then
                     return item.itemType
@@ -3312,8 +3328,8 @@ run(function()
 
     local function getProjectiles()
         local items = {}
-        for _, item in store.inventory.inventory.items do
-            local meta = bedwars.ItemMeta[item.itemType]
+        for _, item in pairs(store.Inventory.observedInventory.inventory.items) do
+            local meta = bedwars.ItemTable[item.itemType]
             local proj = meta and meta.projectileSource
             local ammo = proj and getAmmo(proj, item.itemType)
             if ammo and table.find(List.ListEnabled, ammo) then
@@ -3344,28 +3360,28 @@ run(function()
                 repeat
                     task.wait(0.1)
                     if entitylib.isAlive and (workspace:GetServerTimeNow() - bedwars.SwordController.lastAttack) > 0.5 then
-                        local ent = entitylib.EntityPosition({
-                            Part = 'RootPart',
-                            Range = Range.Value,
-                            Players = Targets.Players.Enabled,
-                            NPCs = Targets.NPCs.Enabled,
-                            Wallcheck = Targets.Walls.Enabled
+                        local ent = entitylib.getClosestEntity({
+                            maxRange = Range.Value,
+                            checkPlayers = Targets.Players.Enabled,
+                            checkNPCs = Targets.NPCs.Enabled,
+                            wallCheck = Targets.Walls.Enabled
                         })
 
                         if ent then
-                            local pos = entitylib.character.RootPart.Position
+                            local pos = entitylib.character.HumanoidRootPart.Position
                             for _, data in pairs(getProjectiles()) do
                                 if (FireDelays[data.item.itemType] or 0) < tick() then
                                     local meta = bedwars.ProjectileMeta[data.projectile]
+                                    if not meta then continue end
+                                    
                                     local projSpeed = meta.launchVelocity
                                     local gravity = meta.gravitationalAcceleration or 196.2
 
                                     -- Add variation to target position
-                                    local targetPos = addAimVariation(ent.RootPart.Position, 0.5)
-                                    local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, targetPos, ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight, ent.Jumping and 42.6 or nil, rayCheck)
+                                    local targetPos = addAimVariation(ent.HumanoidRootPart.Position, 0.5)
+                                    local calc = bedwars.ProjectileController:solveTrajectory(pos, projSpeed, targetPos, ent.HumanoidRootPart.Velocity, gravity)
 
                                     if calc then
-                                        targetinfo.Targets[ent] = tick() + 1
                                         local switched = switchItem(data.item.tool)
 
                                         task.spawn(function()
@@ -3375,35 +3391,39 @@ run(function()
                                             local id = httpService:GenerateGUID(true)
                                             local shootPosition = (CFrame.new(pos, aimPos) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))).Position
 
-                                            -- Create and fire projectile
-                                            bedwars.ProjectileController:createLocalProjectile(meta, data.ammo, data.projectile, shootPosition, id, dir * projSpeed, {drawDurationSeconds = 1})
-                                            local res = clients.ProjectileRemote:CallServerAsync(
-                                                data.item.tool,
-                                                data.ammo,
-                                                data.projectile,
-                                                shootPosition,
-                                                pos,
-                                                dir * projSpeed,
-                                                id,
-                                                {
-                                                    drawDurationSeconds = 1,
-                                                    shotId = httpService:GenerateGUID(false)
-                                                },
-                                                workspace:GetServerTimeNow() - 0.045
-                                            )
+                                            -- Create and fire projectile with error handling
+                                            local success, err = pcall(function()
+                                                bedwars.ProjectileController:createLocalProjectile(meta, data.ammo, data.projectile, shootPosition, id, dir * projSpeed, {drawDurationSeconds = 1})
+                                                return clients.ProjectileRemote:CallServerAsync(
+                                                    data.item.tool,
+                                                    data.ammo,
+                                                    data.projectile,
+                                                    shootPosition,
+                                                    pos,
+                                                    dir * projSpeed,
+                                                    id,
+                                                    {
+                                                        drawDurationSeconds = 1,
+                                                        shotId = httpService:GenerateGUID(false)
+                                                    },
+                                                    workspace:GetServerTimeNow() - 0.045
+                                                )
+                                            end)
 
-                                            if not res then
+                                            if not success then
                                                 FireDelays[data.item.itemType] = tick()
                                             else
                                                 local shoot = data.meta.launchSound
-                                                shoot = shoot and shoot[math.random(1, #shoot)] or nil
-                                                if shoot then
-                                                    bedwars.SoundManager:playSound(shoot)
+                                                if shoot and type(shoot) == "table" then
+                                                    shoot = shoot[math.random(1, #shoot)]
+                                                    if shoot then
+                                                        bedwars.SoundManager:playSound(shoot)
+                                                    end
                                                 end
                                             end
                                         end)
 
-                                        FireDelays[data.item.itemType] = tick() + data.meta.fireDelaySec + (math.random() * 0.2)
+                                        FireDelays[data.item.itemType] = tick() + (data.meta.fireDelaySec or 0.5) + (math.random() * 0.2)
                                         if switched then
                                             task.wait(0.05)
                                         end
