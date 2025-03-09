@@ -3239,7 +3239,11 @@ run(function()
 	})
 end)
 	
-    local ProjectileAura
+   		if WallCheck.Enabled then
+							rayCheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
+							rayCheck.CollisionGroup = root.CollisionGroup
+							local ray = workspace:Raycast(root.Position, destination, rayCheck)
+local ProjectileAura
     local Targets
     local Range
     local List
@@ -3271,7 +3275,7 @@ end)
         for _, item in store.inventory.inventory.items do
             local proj = bedwars.ItemMeta[item.itemType].projectileSource
             local ammo = proj and getAmmo(proj, item.itemType)
-            if ammo and table.find(List.ObjectList, ammo) then
+            if ammo and table.find(List.Objects, ammo) then
                 table.insert(items, {
                     item,
                     ammo,
@@ -3391,7 +3395,7 @@ end)
         Function = function(callback)
             if callback then
                 toolProjectileMap = {}
-                for _, entry in pairs(List.ObjectList) do
+                for _, entry in pairs(List.Objects) do
                     if entry:find(":") then
                         local tool, projectiles = entry:match("(.+):(.+)")
                         if tool and projectiles then
@@ -3452,11 +3456,7 @@ run(function()
 						local moveDirection = AntiVoidDirection or entitylib.character.Humanoid.MoveDirection
 						local destination = (moveDirection * math.max(Value.Value - velo, 0) * dt)
 	
-						if WallCheck.Enabled then
-							rayCheck.FilterDescendantsInstances = {lplr.Character, gameCamera}
-							rayCheck.CollisionGroup = root.CollisionGroup
-							local ray = workspace:Raycast(root.Position, destination, rayCheck)
-							if ray then
+											if ray then
 								destination = ((ray.Position + ray.Normal) - root.Position)
 							end
 						end
