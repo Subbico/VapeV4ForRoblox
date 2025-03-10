@@ -3428,7 +3428,6 @@ FireWait = ProjectileAura:CreateSlider({
 
 
 
-
 	
 run(function()
 	local BedESP
