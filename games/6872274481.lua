@@ -5033,7 +5033,7 @@ local Tower
 local Downwards
 local Diagonal
 local LimitItem
-local Mousei
+local Mouse
 local TowerCPS
 
 -- Pre-calculate adjacent positions
@@ -5096,27 +5096,6 @@ local function checkAdjacent(pos)
     return false
 end
 
--- Get position under legs for block placement
-local function getLegPosition(character)
-    local root = character.RootPart
-    local humanoid = character.Humanoid
-    -- Calculate leg position (slightly above feet to ensure proper placement)
-    return root.Position - Vector3.new(0, humanoid.HipHeight + 1.5, 0)
-end
-
--- Check if we can place at position
-local function canPlaceAt(position, checkAdjacent)
-    local roundedPos = roundPos(position)
-    local block, blockpos = getPlacedBlock(roundedPos)
-    if not block then
-        if checkAdjacent then
-            blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(position)
-        end
-        return blockpos ~= nil, blockpos
-    end
-    return false, nil
-end
-
 local function getScaffoldBlock()
     if store.hand.toolType == 'block' then
         return store.hand.tool.Name, store.hand.amount
@@ -5147,62 +5126,36 @@ Scaffold = vape.Categories.Utility:CreateModule({
             -- Fast tower building with CPS
             local function startTowerBuild()
                 if towerThread then return end
-                local minCPS, maxCPS = TowerCPS.GetMinValue(), TowerCPS.GetMaxValue()
-                local targetCPS = (minCPS + maxCPS) / 2 -- Calculate the average target CPS
                 towerThread = task.spawn(function()
                     local lastBlockPos = nil
-                    local jumpAnim = nil
                     while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or 
                         (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)) do
                         local currentTime = tick()
-                        if currentTime - lastPlace >= (1 / targetCPS) then
+                        if currentTime - lastPlace >= (1 / TowerCPS.GetRandomValue()) then
                             if entitylib.isAlive then
                                 local root = entitylib.character.RootPart
                                 if root then
-                                    local wool, amount = getScaffoldBlock()
-                                    local humanoid = entitylib.character.Humanoid
-                                    local moveDir = humanoid.MoveDirection
-                                    local isMoving = moveDir.Magnitude > 0
-                                    
-                                    -- Get position under legs
-                                    local legPos = getLegPosition(entitylib.character)
-                                    local canPlace, blockpos = canPlaceAt(legPos, checkAdjacent)
-                                    
-                                    -- Only apply velocity and handle animation if we can place blocks under legs
-                                    if (wool or not LimitItem.Enabled) and canPlace then
-                                        -- Apply velocity
+                                    local wool = getScaffoldBlock()
+                                    -- Only apply velocity if we have blocks or LimitItem is off
+                                    if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
                                         root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
-                                        
-                                        -- Handle animation
-                                        if isMoving then
-                                            -- Play jump animation when moving
-                                            if not jumpAnim then
-                                                jumpAnim = humanoid:LoadAnimation(humanoid.JumpAnim)
-                                                jumpAnim:Play()
-                                            end
-                                        else
-                                            -- Stop jump animation when not moving
-                                            if jumpAnim then
-                                                jumpAnim:Stop()
-                                                jumpAnim = nil
-                                            end
-                                        end
-                                    else
-                                        -- Stop animation if we can't place blocks
-                                        if jumpAnim then
-                                            jumpAnim:Stop()
-                                            jumpAnim = nil
-                                        end
                                     end
                                     
-                                    -- Place blocks if we have them and can place
-                                    if wool and canPlace and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        local roundedLegPos = roundPos(legPos)
-                                        if lastBlockPos ~= roundedLegPos then
-                                            if blockpos then
-                                                task.spawn(bedwars.placeBlock, blockpos, wool, false)
-                                                lastPlace = currentTime
-                                                lastBlockPos = roundedLegPos
+                                    -- Place blocks if we have them
+                                    if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                        local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
+                                        local roundedPos = roundPos(pos)
+                                        
+                                        -- Only do proximity check if position changed
+                                        if lastBlockPos ~= roundedPos then
+                                            local block, blockpos = getPlacedBlock(roundedPos)
+                                            if not block then
+                                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(pos)
+                                                if blockpos then
+                                                    task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                                    lastPlace = currentTime
+                                                    lastBlockPos = roundedPos
+                                                end
                                             end
                                         end
                                     end
@@ -5210,11 +5163,6 @@ Scaffold = vape.Categories.Utility:CreateModule({
                             end
                         end
                         task.wait(0.01)
-                    end
-                    -- Clean up animation when tower ends
-                    if jumpAnim then
-                        jumpAnim:Stop()
-                        jumpAnim = nil
                     end
                     towerThread = nil
                 end)
@@ -5274,9 +5222,9 @@ Scaffold = vape.Categories.Utility:CreateModule({
                     if wool then
                         local root = entitylib.character.RootPart
                         local moveDir = entitylib.character.Humanoid.MoveDirection
-                        -- Get position under legs for scaffold
-                        local legPos = getLegPosition(entitylib.character)
-                        local basePos = legPos
+                        local hipHeight = entitylib.character.HipHeight
+                        local downOffset = Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5
+                        local basePos = root.Position - Vector3.new(0, hipHeight + downOffset, 0)
 
                         for i = Expand.Value, 1, -1 do
                             local currentpos = roundPos(basePos + moveDir * (i * 3))
@@ -5292,9 +5240,12 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                 end
                             end
 
-                            local canPlace, blockpos = canPlaceAt(currentpos, checkAdjacent)
-                            if canPlace and blockpos then
-                                task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                            local block, blockpos = getPlacedBlock(currentpos)
+                            if not block then
+                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
+                                if blockpos then
+                                    task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                end
                             end
                             lastpos = currentpos
                         end
@@ -5364,7 +5315,6 @@ TowerCPS = Scaffold:CreateTwoSlider({
     DefaultMax = 20,
     Darker = true
 })
-
 
                                                                                                                                                                                                                                                                                                                                                 
 																																																																													
