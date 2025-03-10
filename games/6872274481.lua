@@ -5038,24 +5038,28 @@ local Mouse
 local TowerCPS
 
 -- Pre-calculate adjacent positions
-local adjacent = {}
+local adjacent = table.create(26)
 for x = -3, 3, 3 do
     for y = -3, 3, 3 do
         for z = -3, 3, 3 do
-            if x ~= 0 or z ~= 0 or y ~= 0 then
-                table.insert(adjacent, Vector3.new(x, y, z))
+            if x ~= 0 or y ~= 0 or z ~= 0 then
+                adjacent[#adjacent + 1] = Vector3.new(x, y, z)
             end
         end
     end
 end
 
+local lastpos = Vector3.zero
+local label
+local lastPlace = 0
+
 -- Optimized corner check using cached unit vectors
-local function nearCorner(posCheck, pos)
+local function nearCorner(poscheck, pos)
     local offset = Vector3.new(3, 3, 3)
-    local startpos = posCheck - offset
-    local endpos = posCheck + offset
-    local dir = (pos - posCheck).Unit
-    local check = posCheck + dir * 100
+    local startpos = poscheck - offset
+    local endpos = poscheck + offset
+    local dir = (pos - poscheck).Unit
+    local check = poscheck + dir * 100
     return Vector3.new(
         math.clamp(check.X, startpos.X, endpos.X),
         math.clamp(check.Y, startpos.Y, endpos.Y),
@@ -5070,7 +5074,7 @@ local function blockProximity(pos)
     local startPos = bedwars.BlockController:getBlockPosition(pos - Vector3.new(15, 15, 15))
     local endPos = bedwars.BlockController:getBlockPosition(pos + Vector3.new(15, 15, 15))
     local blocks = getBlocksInPoints(startPos, endPos)
-
+    
     for i = 1, #blocks do
         local blockpos = nearCorner(blocks[i], pos)
         local newmag = (pos - blockpos).Magnitude
@@ -5093,7 +5097,6 @@ local function checkAdjacent(pos)
     return false
 end
 
--- Get scaffold block
 local function getScaffoldBlock()
     if store.hand.toolType == 'block' then
         return store.hand.tool.Name, store.hand.amount
@@ -5111,12 +5114,6 @@ local function getScaffoldBlock()
     return nil, 0
 end
 
-local lastpos = Vector3.zero
-local label
-local lastPlace = 0
-local isJumping = false
-
--- Scaffold module
 Scaffold = vape.Categories.Utility:CreateModule({
     Name = 'Scaffold',
     Function = function(callback)
@@ -5126,7 +5123,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
 
         if callback then
             local towerThread
-
+            
             -- Fast tower building with CPS
             local function startTowerBuild()
                 if towerThread then return end
@@ -5143,59 +5140,13 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                     -- Only apply velocity if we have blocks or LimitItem is off
                                     if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
                                         root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
-                                        isJumping = true
                                     end
-
-                                    -- Play idle animation when jumping with tower enabled
-                                    if Tower.Enabled and LimitItem.Enabled and wool and isJumping then
-                                        local player = game.Players.LocalPlayer
-                                        local character = player.Character
-                                        if character then
-                                            local animate = character:FindFirstChild("Animate")
-                                            if animate then
-                                                local humanoid = character:FindFirstChild("Humanoid")
-                                                if humanoid then
-                                                    -- Check if the player is moving
-                                                    local moveDir = entitylib.character.Humanoid.MoveDirection
-                                                    if moveDir.Magnitude > 0 then
-                                                        -- Play walk/run animation when moving and jumping
-                                                        local username = player.Name
-                                                        local workspace = game.Workspace
-                                                        local character = workspace:FindFirstChild(username)
-                                                        if character then
-                                                            local animate = character:FindFirstChild("Animate")
-                                                            if animate then
-                                                                local run = animate:FindFirstChild("run")
-                                                                if run then
-                                                                    local runAnim = run:FindFirstChild("RunAnim")
-                                                                    if runAnim then
-                                                                        humanoid:LoadAnimation(runAnim):Play()
-                                                                    end
-                                                                end
-                                                            end
-                                                        end
-                                                    else
-                                                        -- Play idle animation when not moving and jumping
-                                                        local idle = animate:FindFirstChild("idle")
-                                                        if idle then
-                                                            local animation1 = idle:FindFirstChild("Animation1")
-                                                            local animation2 = idle:FindFirstChild("Animation2")
-                                                            if animation1 and animation2 then
-                                                                humanoid:LoadAnimation(animation1):Play()
-                                                                humanoid:LoadAnimation(animation2):Play()
-                                                            end
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-
+                                    
                                     -- Place blocks if we have them
                                     if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
                                         local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
                                         local roundedPos = roundPos(pos)
-
+                                        
                                         -- Only do proximity check if position changed
                                         if lastBlockPos ~= roundedPos then
                                             local block, blockpos = getPlacedBlock(roundedPos)
@@ -5217,87 +5168,27 @@ Scaffold = vape.Categories.Utility:CreateModule({
                     towerThread = nil
                 end)
             end
-
+            
             local function stopTowerBuild()
                 if towerThread then
                     task.cancel(towerThread)
                     towerThread = nil
-                    isJumping = false
-                    local player = game.Players.LocalPlayer
-                    local character = player.Character
-                    if character then
-                        local animate = character:FindFirstChild("Animate")
-                        if animate then
-                            local humanoid = character:FindFirstChild("Humanoid")
-                            if humanoid then
-                                -- Reset animations when not jumping or not having blocks equipped
-                                if not isJumping or not LimitItem.Enabled or not wool then
-                                    -- Reset idle animation
-                                    local idle = animate:FindFirstChild("idle")
-                                    if idle then
-                                        local animation1 = idle:FindFirstChild("Animation1")
-                                        local animation2 = idle:FindFirstChild("Animation2")
-                                        if animation1 and animation2 then
-                                            humanoid:LoadAnimation(animation1):Play()
-                                            humanoid:LoadAnimation(animation2):Play()
-                                        end
-                                    end
-
-                                    -- Reset walk animation
-                                    local walk = animate:FindFirstChild("walk")
-                                    if walk then
-                                        local walkAnim = walk:FindFirstChild("WalkAnim")
-                                        if walkAnim then
-                                            humanoid:LoadAnimation(walkAnim):Play()
-                                        end
-                                    end
-
-                                    -- Reset run animation
-                                    local run = animate:FindFirstChild("run")
-                                    if run then
-                                        local runAnim = run:FindFirstChild("RunAnim")
-                                        if runAnim then
-                                            humanoid:LoadAnimation(runAnim):Play()
-                                        end
-                                    end
-
-                                    -- Reset jump animation
-                                    local jump = animate:FindFirstChild("jump")
-                                    if jump then
-                                        local jumpAnim = jump:FindFirstChild("JumpAnim")
-                                        if jumpAnim then
-                                            humanoid:LoadAnimation(jumpAnim):Play()
-                                        end
-                                    end
-
-                                    -- Reset fall animation
-                                    local fall = animate:FindFirstChild("fall")
-                                    if fall then
-                                        local fallAnim = fall:FindFirstChild("FallAnim")
-                                        if fallAnim then
-                                            humanoid:LoadAnimation(fallAnim):Play()
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
                 end
             end
-
+            
             -- Input handlers for tower
             Scaffold:Clean(inputService.InputBegan:Connect(function(input)
                 if input.KeyCode == Enum.KeyCode.Space and Tower.Enabled then
                     startTowerBuild()
                 end
             end))
-
+            
             Scaffold:Clean(inputService.InputEnded:Connect(function(input)
                 if input.KeyCode == Enum.KeyCode.Space then
                     stopTowerBuild()
                 end
             end))
-
+            
             -- Mobile support
             if inputService.TouchEnabled then
                 pcall(function()
@@ -5327,10 +5218,6 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         amount = amount or 0
                         label.Text = amount..' <font color="rgb(170, 170, 170)">(Scaffold)</font>'
                         label.TextColor3 = Color3.fromHSV((amount / 128) / 2.8, 0.86, 1)
-                        label.TextSize = 18
-                        label.RichText = true
-                        label.Font = Enum.Font.Arial
-                        label.Visible = Scaffold.Enabled
                     end
 
                     if wool then
@@ -5342,7 +5229,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
 
                         for i = Expand.Value, 1, -1 do
                             local currentpos = roundPos(basePos + moveDir * (i * 3))
-
+                            
                             if Diagonal.Enabled then
                                 local angle = math.abs(math.round(math.deg(math.atan2(-moveDir.X, -moveDir.Z)) / 45) * 45)
                                 if angle % 90 == 45 then
@@ -5374,38 +5261,30 @@ Scaffold = vape.Categories.Utility:CreateModule({
     Tooltip = 'Helps you make bridges/scaffold walk.'
 })
 
--- Expand slider
 Expand = Scaffold:CreateSlider({
     Name = 'Expand',
     Min = 1,
     Max = 6
 })
 
--- Tower toggle
 Tower = Scaffold:CreateToggle({
     Name = 'Tower',
     Default = true
 })
 
--- Downwards toggle
 Downwards = Scaffold:CreateToggle({
     Name = 'Downwards',
     Default = true
 })
 
--- Diagonal toggle
 Diagonal = Scaffold:CreateToggle({
     Name = 'Diagonal',
     Default = true
 })
 
--- Limit item toggle
 LimitItem = Scaffold:CreateToggle({Name = 'Limit to items'})
-
--- Mouse toggle
 Mouse = Scaffold:CreateToggle({Name = 'Require mouse down'})
 
--- Block count toggle
 Count = Scaffold:CreateToggle({
     Name = 'Block Count',
     Function = function(callback)
@@ -5429,7 +5308,6 @@ Count = Scaffold:CreateToggle({
     end
 })
 
--- Tower CPS slider
 TowerCPS = Scaffold:CreateTwoSlider({
     Name = 'Tower CPS',
     Min = 1,
