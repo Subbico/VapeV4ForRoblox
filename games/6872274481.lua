@@ -5138,20 +5138,6 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                     local wool = getScaffoldBlock()
                                     -- Only apply velocity if we have blocks or LimitItem is off
                                     if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        -- Check if we can place blocks underneath
-                                        local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
-                                        local roundedPos = roundPos(pos)
-                                        local block, blockpos = getPlacedBlock(roundedPos)
-                                        if not block then
-                                            blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(pos)
-                                            if not blockpos then
-                                                -- Disable tower and infjump/velocity if we can't place blocks underneath
-                                                Tower.Enabled = false
-                                                entitylib.character.Humanoid.JumpPower = 0
-                                                entitylib.character.Humanoid.WalkSpeed = 0
-                                                return
-                                            end
-                                        end
                                         root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
                                     end
                                     
@@ -5254,15 +5240,11 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                 end
                             end
 
-                            -- Only place blocks where legs are
-                            local legPos = entitylib.character.LowerTorso.Position
-                            if (currentpos - legPos).Magnitude < 2 then
-                                local block, blockpos = getPlacedBlock(currentpos)
-                                if not block then
-                                    blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
-                                    if blockpos then
-                                        task.spawn(bedwars.placeBlock, blockpos, wool, false)
-                                    end
+                            local block, blockpos = getPlacedBlock(currentpos)
+                            if not block then
+                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
+                                if blockpos then
+                                    task.spawn(bedwars.placeBlock, blockpos, wool, false)
                                 end
                             end
                             lastpos = currentpos
@@ -5333,7 +5315,6 @@ TowerCPS = Scaffold:CreateTwoSlider({
     DefaultMax = 20,
     Darker = true
 })
-
 
                                                                                                                                                                                                                                                                                                                                                 
 																																																																													
