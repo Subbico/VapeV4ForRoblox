@@ -3239,16 +3239,17 @@ run(function()
 	})
 end)
 	
-run(function()
-	local ProjectileAura
+local ProjectileAura
 	local Targets
 	local Range
 	local List
 	local LimitItem
+	local FireDelay
 	local rayCheck = RaycastParams.new()
 	rayCheck.FilterType = Enum.RaycastFilterType.Include
 	local projectileRemote = {InvokeServer = function() end}
 	local FireDelays = {}
+	local currentAnimation = nil
 	task.spawn(function()
 		projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
 	end)
@@ -3265,6 +3266,20 @@ run(function()
 		if not store.hand.tool then return false end
 		local itemMeta = bedwars.ItemMeta[store.hand.tool.Name]
 		return itemMeta and itemMeta.projectileSource ~= nil
+	end
+	
+	local function playAnimation(itemType)
+		if currentAnimation then
+			currentAnimation:Stop()
+			currentAnimation = nil
+		end
+		
+		local animationController = entitylib.character:WaitForChild("Humanoid"):WaitForChild("Animator")
+		local itemMeta = bedwars.ItemMeta[itemType]
+		if itemMeta and itemMeta.projectileSource and itemMeta.projectileSource.fireAnimation then
+			currentAnimation = animationController:LoadAnimation(itemMeta.projectileSource.fireAnimation)
+			currentAnimation:Play()
+		end
 	end
 	
 	local function getProjectiles()
@@ -3313,6 +3328,9 @@ run(function()
 									if calc then
 										targetinfo.Targets[ent] = tick() + 1
 										local switched = switchItem(item.tool)
+										
+										-- Play the shooting animation
+										playAnimation(item.itemType)
 	
 										task.spawn(function()
 											local dir, id = CFrame.lookAt(pos, calc).LookVector, httpService:GenerateGUID(true)
@@ -3330,7 +3348,11 @@ run(function()
 											end
 										end)
 	
-										FireDelays[item.itemType] = tick() + itemMeta.fireDelaySec
+										-- Use custom fire delay if set
+										local baseDelay = itemMeta.fireDelaySec
+										local customDelay = FireDelay.Value
+										FireDelays[item.itemType] = tick() + math.max(baseDelay, customDelay)
+										
 										if switched then
 											task.wait(0.05)
 										end
@@ -3341,6 +3363,12 @@ run(function()
 					end
 					task.wait(0.1)
 				until not ProjectileAura.Enabled
+			else
+				-- Stop any ongoing animation when disabled
+				if currentAnimation then
+					currentAnimation:Stop()
+					currentAnimation = nil
+				end
 			end
 		end,
 		Tooltip = 'Shoots people around you'
@@ -3366,6 +3394,13 @@ run(function()
 		Name = 'Limit to items',
 		Default = true,
 		Tooltip = 'Only shoots when projectile tools are equipped'
+	})
+	FireDelay = ProjectileAura:CreateSlider({
+		Name = 'Fire Delay',
+		Min = 0.1,
+		Max = 5,
+		Default = 0.1,
+		Suffix = 'sec'
 	})
 end)
 	
