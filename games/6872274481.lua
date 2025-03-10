@@ -5147,14 +5147,14 @@ Scaffold = vape.Categories.Utility:CreateModule({
             -- Fast tower building with CPS
             local function startTowerBuild()
                 if towerThread then return end
+                local minCPS, maxCPS = TowerCPS.GetMinValue(), TowerCPS.GetMaxValue()
+                local targetCPS = (minCPS + maxCPS) / 2 -- Calculate the average target CPS
                 towerThread = task.spawn(function()
                     local lastBlockPos = nil
                     local jumpAnim = nil
                     while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or 
                         (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)) do
                         local currentTime = tick()
-                        local minCPS, maxCPS = TowerCPS.GetMinValue(), TowerCPS.GetMaxValue()
-                        local targetCPS = math.random(minCPS, maxCPS)
                         if currentTime - lastPlace >= (1 / targetCPS) then
                             if entitylib.isAlive then
                                 local root = entitylib.character.RootPart
@@ -5364,6 +5364,7 @@ TowerCPS = Scaffold:CreateTwoSlider({
     DefaultMax = 20,
     Darker = true
 })
+
 
                                                                                                                                                                                                                                                                                                                                                 
 																																																																													
