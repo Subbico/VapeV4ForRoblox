@@ -5169,6 +5169,31 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                         end
                                     end
 
+                                    -- Check if the player is moving
+                                    local moveDir = entitylib.character.Humanoid.MoveDirection
+                                    if moveDir.Magnitude > 0 then
+                                        -- Play jump animation when moving and jumping
+                                        local player = game.Players.LocalPlayer
+                                        local character = player.Character
+                                        if character then
+                                            local animate = character:FindFirstChild("Animate")
+                                            if animate then
+                                                local jump = animate:FindFirstChild("jump")
+                                                if jump then
+                                                    local animation1 = jump:FindFirstChild("Animation1")
+                                                    local animation2 = jump:FindFirstChild("Animation2")
+                                                    if animation1 and animation2 then
+                                                        local humanoid = character:FindFirstChild("Humanoid")
+                                                        if humanoid then
+                                                            humanoid:LoadAnimation(animation1):Play()
+                                                            humanoid:LoadAnimation(animation2):Play()
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+
                                     -- Place blocks if we have them
                                     if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
                                         local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
