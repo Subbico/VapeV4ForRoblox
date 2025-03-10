@@ -3285,20 +3285,24 @@ local function getProjectiles()
             end
         end
     end
+    print("Get Projectiles:", #items)
     return items
 end
 
 local function switchItem(item)
     if store.hand.tool and store.hand.tool.Name ~= item.Name then
+        print("Switching to:", item.Name)
         store.hand.previousTool = store.hand.tool
         store.hand:EquipTool(item)
         return true
     end
+    print("Already equipped:", item.Name)
     return false
 end
 
 local function switchBackToPreviousTool()
     if store.hand.previousTool then
+        print("Switching back to:", store.hand.previousTool.Name)
         store.hand:EquipTool(store.hand.previousTool)
         store.hand.previousTool = nil
     end
@@ -3406,6 +3410,7 @@ FireWait = ProjectileAura:CreateSlider({
     Default = 1,
     Suffix = 'sec'
 })
+
 
 
 
