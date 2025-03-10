@@ -5042,7 +5042,7 @@ local adjacent = table.create(26)
 for x = -3, 3, 3 do
     for y = -3, 3, 3 do
         for z = -3, 3, 3 do
-            if x ~= 0 or y ~= 0 or z ~= 0 then
+            if x ~=  or z ~= 0 then0 or y ~= 0
                 adjacent[#adjacent + 1] = Vector3.new(x, y, z)
             end
         end
@@ -5158,6 +5158,27 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                                         if humanoid then
                                                             humanoid:LoadAnimation(animation1):Play()
                                                             humanoid:LoadAnimation(animation2):Play()
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+
+                                    -- Play jump animation when moving while jumping
+                                    if Tower.Enabled and LimitItem.Enabled and wool then
+                                        local player = game.Players.LocalPlayer
+                                        local character = player.Character
+                                        if character then
+                                            local animate = character:FindFirstChild("Animate")
+                                            if animate then
+                                                local jump = animate:FindFirstChild("jump")
+                                                if jump then
+                                                    local jumpAnim = jump:FindFirstChild("JumpAnim")
+                                                    if jumpAnim then
+                                                        local humanoid = character:FindFirstChild("Humanoid")
+                                                        if humanoid then
+                                                            humanoid:LoadAnimation(jumpAnim):Play()
                                                         end
                                                     end
                                                 end
@@ -5339,6 +5360,7 @@ TowerCPS = Scaffold:CreateTwoSlider({
     DefaultMax = 20,
     Darker = true
 })
+
 																																																																													
 run(function()
 	local ShopTierBypass
