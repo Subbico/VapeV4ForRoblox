@@ -5114,6 +5114,7 @@ end
 local lastpos = Vector3.zero
 local label
 local lastPlace = 0
+local isJumping = false
 
 -- Scaffold module
 Scaffold = vape.Categories.Utility:CreateModule({
@@ -5142,10 +5143,11 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                     -- Only apply velocity if we have blocks or LimitItem is off
                                     if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
                                         root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                                        isJumping = true
                                     end
 
                                     -- Play idle animation when jumping with tower enabled
-                                    if Tower.Enabled and LimitItem.Enabled and wool then
+                                    if Tower.Enabled and LimitItem.Enabled and wool and isJumping then
                                         local player = game.Players.LocalPlayer
                                         local character = player.Character
                                         if character then
@@ -5198,6 +5200,18 @@ Scaffold = vape.Categories.Utility:CreateModule({
                 if towerThread then
                     task.cancel(towerThread)
                     towerThread = nil
+                    isJumping = false
+                    local player = game.Players.LocalPlayer
+                    local character = player.Character
+                    if character then
+                        local animate = character:FindFirstChild("Animate")
+                        if animate then
+                            local humanoid = character:FindFirstChild("Humanoid")
+                            if humanoid then
+                                humanoid:LoadAnimation(humanoid.WalkAnim):Play()
+                            end
+                        end
+                    end
                 end
             end
 
