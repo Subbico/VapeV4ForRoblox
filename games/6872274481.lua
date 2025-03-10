@@ -5145,7 +5145,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                     end
 
                                     -- Play idle animation when jumping with tower enabled
-                                    if Tower.Enabled then
+                                    if Tower.Enabled and LimitItem.Enabled and wool then
                                         local player = game.Players.LocalPlayer
                                         local character = player.Character
                                         if character then
@@ -5160,27 +5160,6 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                                         if humanoid then
                                                             humanoid:LoadAnimation(animation1):Play()
                                                             humanoid:LoadAnimation(animation2):Play()
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-
-                                    -- Play jump animation when moving while jumping
-                                    if Tower.Enabled and LimitItem.Enabled and wool then
-                                        local player = game.Players.LocalPlayer
-                                        local character = player.Character
-                                        if character then
-                                            local animate = character:FindFirstChild("Animate")
-                                            if animate then
-                                                local jump = animate:FindFirstChild("jump")
-                                                if jump then
-                                                    local jumpAnim = jump:FindFirstChild("JumpAnim")
-                                                    if jumpAnim then
-                                                        local humanoid = character:FindFirstChild("Humanoid")
-                                                        if humanoid then
-                                                            humanoid:LoadAnimation(jumpAnim):Play()
                                                         end
                                                     end
                                                 end
