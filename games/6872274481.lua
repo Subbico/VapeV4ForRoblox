@@ -5138,11 +5138,8 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                 if root then
                                     local wool = getScaffoldBlock()
                                     -- Only apply velocity if we have blocks or LimitItem is off
-                                    local canBuildUnderneath = checkAdjacent(root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0))
-                                    if (wool or not LimitItem.Enabled) and canBuildUnderneath and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                    if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
                                         root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
-                                    else
-                                        root.Velocity = Vector3.new(root.Velocity.X, 0, root.Velocity.Z)
                                     end
                                     
                                     -- Place blocks if we have them
