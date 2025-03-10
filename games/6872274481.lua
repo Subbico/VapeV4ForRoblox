@@ -3290,10 +3290,18 @@ end
 
 local function switchItem(item)
     if store.hand.tool and store.hand.tool.Name ~= item.Name then
+        store.hand.previousTool = store.hand.tool
         store.hand:EquipTool(item)
         return true
     end
     return false
+end
+
+local function switchBackToPreviousTool()
+    if store.hand.previousTool then
+        store.hand:EquipTool(store.hand.previousTool)
+        store.hand.previousTool = nil
+    end
 end
 
 ProjectileAura = vape.Categories.Blatant:CreateModule({
@@ -3345,7 +3353,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                     FireDelays[item.itemType] = tick() + math.max(itemMeta.fireDelaySec, FireWait.Value)
                                     if switched then
                                         task.wait(0.05)
-                                        store.hand:EquipTool(store.hand.previousTool)
+                                        switchBackToPreviousTool()
                                     end
                                 end
                             end
