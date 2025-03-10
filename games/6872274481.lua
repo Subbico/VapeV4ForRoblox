@@ -5038,28 +5038,24 @@ local Mouse
 local TowerCPS
 
 -- Pre-calculate adjacent positions
-local adjacent = table.create(26)
+local adjacent = {}
 for x = -3, 3, 3 do
     for y = -3, 3, 3 do
         for z = -3, 3, 3 do
-            if x ~=  or z ~= 0 then0 or y ~= 0
-                adjacent[#adjacent + 1] = Vector3.new(x, y, z)
+            if x ~= 0 or z ~= 0 or y ~= 0 then
+                table.insert(adjacent, Vector3.new(x, y, z))
             end
         end
     end
 end
 
-local lastpos = Vector3.zero
-local label
-local lastPlace = 0
-
 -- Optimized corner check using cached unit vectors
-local function nearCorner(poscheck, pos)
+local function nearCorner(posCheck, pos)
     local offset = Vector3.new(3, 3, 3)
-    local startpos = poscheck - offset
-    local endpos = poscheck + offset
-    local dir = (pos - poscheck).Unit
-    local check = poscheck + dir * 100
+    local startpos = posCheck - offset
+    local endpos = posCheck + offset
+    local dir = (pos - posCheck).Unit
+    local check = posCheck + dir * 100
     return Vector3.new(
         math.clamp(check.X, startpos.X, endpos.X),
         math.clamp(check.Y, startpos.Y, endpos.Y),
@@ -5074,7 +5070,7 @@ local function blockProximity(pos)
     local startPos = bedwars.BlockController:getBlockPosition(pos - Vector3.new(15, 15, 15))
     local endPos = bedwars.BlockController:getBlockPosition(pos + Vector3.new(15, 15, 15))
     local blocks = getBlocksInPoints(startPos, endPos)
-    
+
     for i = 1, #blocks do
         local blockpos = nearCorner(blocks[i], pos)
         local newmag = (pos - blockpos).Magnitude
@@ -5097,6 +5093,7 @@ local function checkAdjacent(pos)
     return false
 end
 
+-- Get scaffold block
 local function getScaffoldBlock()
     if store.hand.toolType == 'block' then
         return store.hand.tool.Name, store.hand.amount
@@ -5114,6 +5111,11 @@ local function getScaffoldBlock()
     return nil, 0
 end
 
+local lastpos = Vector3.zero
+local label
+local lastPlace = 0
+
+-- Scaffold module
 Scaffold = vape.Categories.Utility:CreateModule({
     Name = 'Scaffold',
     Function = function(callback)
@@ -5123,7 +5125,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
 
         if callback then
             local towerThread
-            
+
             -- Fast tower building with CPS
             local function startTowerBuild()
                 if towerThread then return end
@@ -5141,7 +5143,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                     if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
                                         root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
                                     end
-                                    
+
                                     -- Play idle animation when jumping with tower enabled
                                     if Tower.Enabled then
                                         local player = game.Players.LocalPlayer
@@ -5190,7 +5192,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                     if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
                                         local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
                                         local roundedPos = roundPos(pos)
-                                        
+
                                         -- Only do proximity check if position changed
                                         if lastBlockPos ~= roundedPos then
                                             local block, blockpos = getPlacedBlock(roundedPos)
@@ -5212,27 +5214,27 @@ Scaffold = vape.Categories.Utility:CreateModule({
                     towerThread = nil
                 end)
             end
-            
+
             local function stopTowerBuild()
                 if towerThread then
                     task.cancel(towerThread)
                     towerThread = nil
                 end
             end
-            
+
             -- Input handlers for tower
             Scaffold:Clean(inputService.InputBegan:Connect(function(input)
                 if input.KeyCode == Enum.KeyCode.Space and Tower.Enabled then
                     startTowerBuild()
                 end
             end))
-            
+
             Scaffold:Clean(inputService.InputEnded:Connect(function(input)
                 if input.KeyCode == Enum.KeyCode.Space then
                     stopTowerBuild()
                 end
             end))
-            
+
             -- Mobile support
             if inputService.TouchEnabled then
                 pcall(function()
@@ -5273,7 +5275,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
 
                         for i = Expand.Value, 1, -1 do
                             local currentpos = roundPos(basePos + moveDir * (i * 3))
-                            
+
                             if Diagonal.Enabled then
                                 local angle = math.abs(math.round(math.deg(math.atan2(-moveDir.X, -moveDir.Z)) / 45) * 45)
                                 if angle % 90 == 45 then
@@ -5305,30 +5307,38 @@ Scaffold = vape.Categories.Utility:CreateModule({
     Tooltip = 'Helps you make bridges/scaffold walk.'
 })
 
+-- Expand slider
 Expand = Scaffold:CreateSlider({
     Name = 'Expand',
     Min = 1,
     Max = 6
 })
 
+-- Tower toggle
 Tower = Scaffold:CreateToggle({
     Name = 'Tower',
     Default = true
 })
 
+-- Downwards toggle
 Downwards = Scaffold:CreateToggle({
     Name = 'Downwards',
     Default = true
 })
 
+-- Diagonal toggle
 Diagonal = Scaffold:CreateToggle({
     Name = 'Diagonal',
     Default = true
 })
 
+-- Limit item toggle
 LimitItem = Scaffold:CreateToggle({Name = 'Limit to items'})
+
+-- Mouse toggle
 Mouse = Scaffold:CreateToggle({Name = 'Require mouse down'})
 
+-- Block count toggle
 Count = Scaffold:CreateToggle({
     Name = 'Block Count',
     Function = function(callback)
@@ -5352,6 +5362,7 @@ Count = Scaffold:CreateToggle({
     end
 })
 
+-- Tower CPS slider
 TowerCPS = Scaffold:CreateTwoSlider({
     Name = 'Tower CPS',
     Min = 1,
@@ -5360,6 +5371,7 @@ TowerCPS = Scaffold:CreateTwoSlider({
     DefaultMax = 20,
     Darker = true
 })
+
 
 																																																																													
 run(function()
