@@ -3313,11 +3313,14 @@ local function switchHotbarItem(item)
         for i, v in pairs(store.inventory.hotbar) do
             if v.item and v.item.itemType == item.itemType then
                 if hotbarSwitch(i - 1) then
+                    store.hand.previousTool = store.hand.tool
+                    store.hand:EquipTool(item)
                     return true
                 end
             end
         end
     end
+    return false
 end
 
 ProjectileAura = vape.Categories.Blatant:CreateModule({
