@@ -3245,6 +3245,7 @@ local Range
 local List
 local LimitItem
 local FireWait
+local AutoSwitch
 local rayCheck = RaycastParams.new()
 rayCheck.FilterType = Enum.RaycastFilterType.Include
 local projectileRemote = {InvokeServer = function() end}
@@ -3287,6 +3288,14 @@ local function getProjectiles()
     return items
 end
 
+local function switchItem(item)
+    if store.hand.tool and store.hand.tool.Name ~= item.Name then
+        store.hand:EquipTool(item)
+        return true
+    end
+    return false
+end
+
 ProjectileAura = vape.Categories.Blatant:CreateModule({
     Name = 'ProjectileAura',
     Function = function(callback)
@@ -3312,7 +3321,10 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                 local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, ent.RootPart.Position, ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight, ent.Jumping and 42.6 or nil, rayCheck)
                                 if calc then
                                     targetinfo.Targets[ent] = tick() + 1
-                                    local switched = switchItem(item.tool)
+                                    local switched = false
+                                    if AutoSwitch.Enabled and not hasProjectileEquipped(itemMeta) then
+                                        switched = switchItem(item.tool)
+                                    end
 
                                     task.spawn(function()
                                         local dir, id = CFrame.lookAt(pos, calc).LookVector, httpService:GenerateGUID(true)
@@ -3333,6 +3345,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                     FireDelays[item.itemType] = tick() + math.max(itemMeta.fireDelaySec, FireWait.Value)
                                     if switched then
                                         task.wait(0.05)
+                                        store.hand:EquipTool(store.hand.previousTool)
                                     end
                                 end
                             end
@@ -3372,6 +3385,12 @@ LimitItem = ProjectileAura:CreateToggle({
     Tooltip = 'Only shoots when projectile tools are equipped'
 })
 
+AutoSwitch = ProjectileAura:CreateToggle({
+    Name = 'Auto Switch',
+    Default = false,
+    Tooltip = 'Automatically switches to the projectile tool'
+})
+
 FireWait = ProjectileAura:CreateSlider({
     Name = 'Fire Wait',
     Min = 1,
@@ -3379,6 +3398,7 @@ FireWait = ProjectileAura:CreateSlider({
     Default = 1,
     Suffix = 'sec'
 })
+
 
 
 	
