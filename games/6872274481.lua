@@ -3261,10 +3261,10 @@ local function getAmmo(check)
     end
 end
 
-local function hasProjectileEquipped()
+local function hasProjectileEquipped(check)
     if not store.hand.tool then return false end
     local itemMeta = bedwars.ItemMeta[store.hand.tool.Name]
-    return itemMeta and itemMeta.projectileSource ~= nil
+    return itemMeta and itemMeta.projectileSource == check
 end
 
 local function getProjectiles()
@@ -3274,7 +3274,7 @@ local function getProjectiles()
         local ammo = proj and getAmmo(proj)
         if ammo and table.find(List.ListEnabled, ammo) then
             -- Only add if we have the tool equipped or LimitItem is disabled
-            if not LimitItem.Enabled or hasProjectileEquipped() then
+            if not LimitItem.Enabled or hasProjectileEquipped(proj) then
                 table.insert(items, {
                     item,
                     ammo,
@@ -3379,6 +3379,7 @@ FireWait = ProjectileAura:CreateSlider({
     Default = 1,
     Suffix = 'sec'
 })
+
 
 	
 run(function()
