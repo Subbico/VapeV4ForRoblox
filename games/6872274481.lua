@@ -5153,7 +5153,9 @@ Scaffold = vape.Categories.Utility:CreateModule({
                     while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or 
                         (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)) do
                         local currentTime = tick()
-                        if currentTime - lastPlace >= (1 / TowerCPS.GetRandomValue()) then
+                        local minCPS, maxCPS = TowerCPS.GetMinValue(), TowerCPS.GetMaxValue()
+                        local targetCPS = math.random(minCPS, maxCPS)
+                        if currentTime - lastPlace >= (1 / targetCPS) then
                             if entitylib.isAlive then
                                 local root = entitylib.character.RootPart
                                 if root then
@@ -5362,6 +5364,7 @@ TowerCPS = Scaffold:CreateTwoSlider({
     DefaultMax = 20,
     Darker = true
 })
+
                                                                                                                                                                                                                                                                                                                                                 
 																																																																													
 run(function()
