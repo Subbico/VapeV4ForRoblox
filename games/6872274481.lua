@@ -5153,40 +5153,37 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                         if character then
                                             local animate = character:FindFirstChild("Animate")
                                             if animate then
-                                                local idle = animate:FindFirstChild("idle")
-                                                if idle then
-                                                    local animation1 = idle:FindFirstChild("Animation1")
-                                                    local animation2 = idle:FindFirstChild("Animation2")
-                                                    if animation1 and animation2 then
-                                                        local humanoid = character:FindFirstChild("Humanoid")
-                                                        if humanoid then
-                                                            humanoid:LoadAnimation(animation1):Play()
-                                                            humanoid:LoadAnimation(animation2):Play()
+                                                local humanoid = character:FindFirstChild("Humanoid")
+                                                if humanoid then
+                                                    -- Check if the player is moving
+                                                    local moveDir = entitylib.character.Humanoid.MoveDirection
+                                                    if moveDir.Magnitude > 0 then
+                                                        -- Play walk/run animation when moving and jumping
+                                                        local username = player.Name
+                                                        local workspace = game.Workspace
+                                                        local character = workspace:FindFirstChild(username)
+                                                        if character then
+                                                            local animate = character:FindFirstChild("Animate")
+                                                            if animate then
+                                                                local run = animate:FindFirstChild("run")
+                                                                if run then
+                                                                    local runAnim = run:FindFirstChild("RunAnim")
+                                                                    if runAnim then
+                                                                        humanoid:LoadAnimation(runAnim):Play()
+                                                                    end
+                                                                end
+                                                            end
                                                         end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-
-                                    -- Check if the player is moving
-                                    local moveDir = entitylib.character.Humanoid.MoveDirection
-                                    if moveDir.Magnitude > 0 then
-                                        -- Play jump animation when moving and jumping
-                                        local player = game.Players.LocalPlayer
-                                        local username = player.Name
-                                        local workspace = game.Workspace
-                                        local character = workspace:FindFirstChild(username)
-                                        if character then
-                                            local animate = character:FindFirstChild("Animate")
-                                            if animate then
-                                                local jump = animate:FindFirstChild("jump")
-                                                if jump then
-                                                    local jumpAnim = jump:FindFirstChild("JumpAnim")
-                                                    if jumpAnim then
-                                                        local humanoid = character:FindFirstChild("Humanoid")
-                                                        if humanoid then
-                                                            humanoid:LoadAnimation(jumpAnim):Play()
+                                                    else
+                                                        -- Play idle animation when not moving and jumping
+                                                        local idle = animate:FindFirstChild("idle")
+                                                        if idle then
+                                                            local animation1 = idle:FindFirstChild("Animation1")
+                                                            local animation2 = idle:FindFirstChild("Animation2")
+                                                            if animation1 and animation2 then
+                                                                humanoid:LoadAnimation(animation1):Play()
+                                                                humanoid:LoadAnimation(animation2):Play()
+                                                            end
                                                         end
                                                     end
                                                 end
@@ -5233,7 +5230,55 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         if animate then
                             local humanoid = character:FindFirstChild("Humanoid")
                             if humanoid then
-                                humanoid:LoadAnimation(humanoid.WalkAnim):Play()
+                                -- Reset animations when not jumping or not having blocks equipped
+                                if not isJumping or not LimitItem.Enabled or not wool then
+                                    -- Reset idle animation
+                                    local idle = animate:FindFirstChild("idle")
+                                    if idle then
+                                        local animation1 = idle:FindFirstChild("Animation1")
+                                        local animation2 = idle:FindFirstChild("Animation2")
+                                        if animation1 and animation2 then
+                                            humanoid:LoadAnimation(animation1):Play()
+                                            humanoid:LoadAnimation(animation2):Play()
+                                        end
+                                    end
+
+                                    -- Reset walk animation
+                                    local walk = animate:FindFirstChild("walk")
+                                    if walk then
+                                        local walkAnim = walk:FindFirstChild("WalkAnim")
+                                        if walkAnim then
+                                            humanoid:LoadAnimation(walkAnim):Play()
+                                        end
+                                    end
+
+                                    -- Reset run animation
+                                    local run = animate:FindFirstChild("run")
+                                    if run then
+                                        local runAnim = run:FindFirstChild("RunAnim")
+                                        if runAnim then
+                                            humanoid:LoadAnimation(runAnim):Play()
+                                        end
+                                    end
+
+                                    -- Reset jump animation
+                                    local jump = animate:FindFirstChild("jump")
+                                    if jump then
+                                        local jumpAnim = jump:FindFirstChild("JumpAnim")
+                                        if jumpAnim then
+                                            humanoid:LoadAnimation(jumpAnim):Play()
+                                        end
+                                    end
+
+                                    -- Reset fall animation
+                                    local fall = animate:FindFirstChild("fall")
+                                    if fall then
+                                        local fallAnim = fall:FindFirstChild("FallAnim")
+                                        if fallAnim then
+                                            humanoid:LoadAnimation(fallAnim):Play()
+                                        end
+                                    end
+                                end
                             end
                         end
                     end
@@ -5282,6 +5327,10 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         amount = amount or 0
                         label.Text = amount..' <font color="rgb(170, 170, 170)">(Scaffold)</font>'
                         label.TextColor3 = Color3.fromHSV((amount / 128) / 2.8, 0.86, 1)
+                        label.TextSize = 18
+                        label.RichText = true
+                        label.Font = Enum.Font.Arial
+                        label.Visible = Scaffold.Enabled
                     end
 
                     if wool then
@@ -5389,9 +5438,6 @@ TowerCPS = Scaffold:CreateTwoSlider({
     DefaultMax = 20,
     Darker = true
 })
-
-
-
 																																																																													
 run(function()
 	local ShopTierBypass
