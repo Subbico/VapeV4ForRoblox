@@ -5174,19 +5174,19 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                     if moveDir.Magnitude > 0 then
                                         -- Play jump animation when moving and jumping
                                         local player = game.Players.LocalPlayer
-                                        local character = player.Character
+                                        local username = player.Name
+                                        local workspace = game.Workspace
+                                        local character = workspace:FindFirstChild(username)
                                         if character then
                                             local animate = character:FindFirstChild("Animate")
                                             if animate then
                                                 local jump = animate:FindFirstChild("jump")
                                                 if jump then
-                                                    local animation1 = jump:FindFirstChild("Animation1")
-                                                    local animation2 = jump:FindFirstChild("Animation2")
-                                                    if animation1 and animation2 then
+                                                    local jumpAnim = jump:FindFirstChild("JumpAnim")
+                                                    if jumpAnim then
                                                         local humanoid = character:FindFirstChild("Humanoid")
                                                         if humanoid then
-                                                            humanoid:LoadAnimation(animation1):Play()
-                                                            humanoid:LoadAnimation(animation2):Play()
+                                                            humanoid:LoadAnimation(jumpAnim):Play()
                                                         end
                                                     end
                                                 end
@@ -5389,6 +5389,7 @@ TowerCPS = Scaffold:CreateTwoSlider({
     DefaultMax = 20,
     Darker = true
 })
+
 
 
 																																																																													
