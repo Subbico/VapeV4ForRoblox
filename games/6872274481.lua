@@ -5324,7 +5324,8 @@ Scaffold = vape.Categories.Utility:CreateModule({
 
                 -- Apply visual lag effect
                 if VisualLag.Enabled then
-                    task.wait(0.01 + LagIntensity.Value / 100)
+                    local jitter = math.random() * LagIntensity.Value / 100
+                    task.wait(0.01 + jitter)
                 else
                     task.wait(0.01)
                 end
