@@ -3245,10 +3245,6 @@ local Targets
 
 local Range
 
-local List
-
-local ReverseList
-
 local LimitItem
 
 local FireWait
@@ -3263,7 +3259,7 @@ local projectileRemote = {InvokeServer = function() end}
 
 local FireDelays = {}
 
-local normalMode = true  -- Default mode is normal
+local normalMode = true -- Default mode is normal
 
 task.spawn(function()
     projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
@@ -3288,15 +3284,9 @@ local function getProjectiles()
     for _, item in store.inventory.inventory.items do
         local proj = bedwars.ItemMeta[item.itemType].projectileSource
         local ammo = proj and getAmmo(proj)
-
-        if normalMode then
-            if ammo and table.find(List.ListEnabled, ammo) then
-                if not LimitItem.Enabled or hasProjectileEquipped(proj) then
-                    table.insert(items, {item, ammo, proj.projectileType(ammo), proj})
-                end
-            end
-        else
-            if ammo and not table.find(ReverseList.ListEnabled, ammo) then
+        if ammo then
+            if (normalMode and table.find(List.ListEnabled, ammo)) or 
+               (not normalMode and not table.find(ReverseList.ListEnabled, ammo)) then
                 if not LimitItem.Enabled or hasProjectileEquipped(proj) then
                     table.insert(items, {item, ammo, proj.projectileType(ammo), proj})
                 end
@@ -3351,7 +3341,6 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                         NPCs = Targets.NPCs.Enabled,
                         Wallcheck = Targets.Walls.Enabled
                     })
-
                     if ent then
                         local pos = entitylib.character.RootPart.Position
                         for _, data in getProjectiles() do
@@ -3361,23 +3350,17 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                 local meta = bedwars.ProjectileMeta[projectile]
                                 local projSpeed, gravity = meta.launchVelocity, meta.gravitationalAcceleration or 196.2
                                 local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, ent.RootPart.Position, ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight, ent.Jumping and 42.6 or nil, rayCheck)
-
                                 if calc then
                                     targetinfo.Targets[ent] = tick() + 1
                                     local switched = false
-
                                     if AutoSwitch.Enabled and not hasProjectileEquipped(itemMeta) then
                                         switched = switchHotbarItem(item.tool)
                                     end
-
                                     task.spawn(function()
                                         local dir, id = CFrame.lookAt(pos, calc).LookVector, httpService:GenerateGUID(true)
                                         local shootPosition = (CFrame.new(pos, calc) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))).Position
-
                                         bedwars.ProjectileController:createLocalProjectile(meta, ammo, projectile, shootPosition, id, dir * projSpeed, {drawDurationSeconds = 1})
-
                                         local res = projectileRemote:InvokeServer(item.tool, ammo, projectile, shootPosition, pos, dir * projSpeed, id, {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)}, workspace:GetServerTimeNow() - 0.045)
-
                                         if not res then
                                             FireDelays[item.itemType] = tick()
                                         else
@@ -3388,9 +3371,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                             end
                                         end
                                     end)
-
                                     FireDelays[item.itemType] = tick() + math.max(itemMeta.fireDelaySec, FireWait.Value)
-
                                     if switched then
                                         task.wait(0.05)
                                         switchBackToPreviousTool()
@@ -3414,12 +3395,12 @@ Targets = ProjectileAura:CreateTargets({
 
 List = ProjectileAura:CreateTextList({
     Name = 'Projectiles',
-    Default = {'arrow', 'snowball'}
+    Default = {} -- Empty by default to dynamically handle all projectiles
 })
 
 ReverseList = ProjectileAura:CreateTextList({
     Name = 'Reverse Projectiles',
-    Default = {}  -- Add default projectiles to exclude in reverse mode if needed
+    Default = {} -- Add default projectiles to exclude in reverse mode if needed
 })
 
 Range = ProjectileAura:CreateSlider({
