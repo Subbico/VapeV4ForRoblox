@@ -3240,16 +3240,31 @@ run(function()
 end)
 	
 local ProjectileAura
+
 local Targets
+
 local Range
+
 local List
+
+local ReverseList
+
 local LimitItem
+
 local FireWait
+
 local AutoSwitch
+
 local rayCheck = RaycastParams.new()
+
 rayCheck.FilterType = Enum.RaycastFilterType.Include
+
 local projectileRemote = {InvokeServer = function() end}
+
 local FireDelays = {}
+
+local normalMode = true  -- Default mode is normal
+
 task.spawn(function()
     projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
 end)
@@ -3273,15 +3288,18 @@ local function getProjectiles()
     for _, item in store.inventory.inventory.items do
         local proj = bedwars.ItemMeta[item.itemType].projectileSource
         local ammo = proj and getAmmo(proj)
-        if ammo and table.find(List.ListEnabled, ammo) then
-            -- Only add if we have the tool equipped or LimitItem is disabled
-            if not LimitItem.Enabled or hasProjectileEquipped(proj) then
-                table.insert(items, {
-                    item,
-                    ammo,
-                    proj.projectileType(ammo),
-                    proj
-                })
+
+        if normalMode then
+            if ammo and table.find(List.ListEnabled, ammo) then
+                if not LimitItem.Enabled or hasProjectileEquipped(proj) then
+                    table.insert(items, {item, ammo, proj.projectileType(ammo), proj})
+                end
+            end
+        else
+            if ammo and not table.find(ReverseList.ListEnabled, ammo) then
+                if not LimitItem.Enabled or hasProjectileEquipped(proj) then
+                    table.insert(items, {item, ammo, proj.projectileType(ammo), proj})
+                end
             end
         end
     end
@@ -3313,14 +3331,11 @@ local function switchHotbarItem(item)
         for i, v in pairs(store.inventory.hotbar) do
             if v.item and v.item.itemType == item.itemType then
                 if hotbarSwitch(i - 1) then
-                    store.hand.previousTool = store.hand.tool
-                    store.hand:EquipTool(item)
                     return true
                 end
             end
         end
     end
-    return false
 end
 
 ProjectileAura = vape.Categories.Blatant:CreateModule({
@@ -3346,9 +3361,11 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                 local meta = bedwars.ProjectileMeta[projectile]
                                 local projSpeed, gravity = meta.launchVelocity, meta.gravitationalAcceleration or 196.2
                                 local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, ent.RootPart.Position, ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight, ent.Jumping and 42.6 or nil, rayCheck)
+
                                 if calc then
                                     targetinfo.Targets[ent] = tick() + 1
                                     local switched = false
+
                                     if AutoSwitch.Enabled and not hasProjectileEquipped(itemMeta) then
                                         switched = switchHotbarItem(item.tool)
                                     end
@@ -3356,8 +3373,11 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                     task.spawn(function()
                                         local dir, id = CFrame.lookAt(pos, calc).LookVector, httpService:GenerateGUID(true)
                                         local shootPosition = (CFrame.new(pos, calc) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))).Position
+
                                         bedwars.ProjectileController:createLocalProjectile(meta, ammo, projectile, shootPosition, id, dir * projSpeed, {drawDurationSeconds = 1})
+
                                         local res = projectileRemote:InvokeServer(item.tool, ammo, projectile, shootPosition, pos, dir * projSpeed, id, {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)}, workspace:GetServerTimeNow() - 0.045)
+
                                         if not res then
                                             FireDelays[item.itemType] = tick()
                                         else
@@ -3370,6 +3390,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                     end)
 
                                     FireDelays[item.itemType] = tick() + math.max(itemMeta.fireDelaySec, FireWait.Value)
+
                                     if switched then
                                         task.wait(0.05)
                                         switchBackToPreviousTool()
@@ -3394,6 +3415,11 @@ Targets = ProjectileAura:CreateTargets({
 List = ProjectileAura:CreateTextList({
     Name = 'Projectiles',
     Default = {'arrow', 'snowball'}
+})
+
+ReverseList = ProjectileAura:CreateTextList({
+    Name = 'Reverse Projectiles',
+    Default = {}  -- Add default projectiles to exclude in reverse mode if needed
 })
 
 Range = ProjectileAura:CreateSlider({
@@ -3426,9 +3452,17 @@ FireWait = ProjectileAura:CreateSlider({
     Suffix = 'sec'
 })
 
-
-
-	
+-- Add a toggle button for switching modes
+ProjectileAura:CreateToggle({
+    Name = 'Mode Toggle',
+    Default = true,
+    Tooltip = 'Toggle between normal and reverse mode',
+    Function = function(enabled)
+        normalMode = enabled
+        local mode = normalMode and "Normal" or "Reverse"
+        print("Mode switched to:", mode)
+    end
+})	
 run(function()
 	local BedESP
 	local Reference = {}
