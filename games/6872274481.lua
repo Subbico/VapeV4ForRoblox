@@ -3421,7 +3421,7 @@ LimitItem = ProjectileAura:CreateToggle({
 
 AutoSwitch = ProjectileAura:CreateToggle({
     Name = 'Auto Switch',
-    Default = false,
+    Default = true,
     Tooltip = 'Automatically switches to the projectile tool'
 })
 
