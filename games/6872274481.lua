@@ -3296,11 +3296,45 @@ local function isHoldingBlock()
     return itemMeta and itemMeta.block ~= nil
 end
 
--- Function to check if player is holding a breaking tool
+-- Enhanced function to check if player is holding any breaking tool
 local function isHoldingBreakingTool()
     if not store.hand.tool then return false end
+    
+    -- Get the item metadata
     local itemMeta = bedwars.ItemMeta[store.hand.tool.Name]
-    return itemMeta and itemMeta.breakType ~= nil
+    if not itemMeta then return false end
+    
+    -- Check for any property that indicates it can break blocks
+    if itemMeta.breakType then return true end
+    
+    -- Check if it's in the tools table (which contains breaking tools)
+    for _, tool in pairs(store.tools or {}) do
+        if tool.itemType == store.hand.tool.Name then
+            return true
+        end
+    end
+    
+    -- Check for specific tool categories
+    if itemMeta.sword or itemMeta.pickaxe or itemMeta.axe or 
+       itemMeta.shears or itemMeta.hammer then
+        return true
+    end
+    
+    -- Check for specific item types that are known to break blocks
+    local breakingItems = {
+        "stone_sword", "iron_sword", "diamond_sword", "emerald_sword",
+        "wood_pickaxe", "stone_pickaxe", "iron_pickaxe", "diamond_pickaxe",
+        "wood_axe", "stone_axe", "iron_axe", "diamond_axe",
+        "shears", "hammer"
+    }
+    
+    for _, item in ipairs(breakingItems) do
+        if store.hand.tool.Name == item then
+            return true
+        end
+    end
+    
+    return false
 end
 
 local function getProjectiles()
