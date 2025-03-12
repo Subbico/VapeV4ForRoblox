@@ -5099,6 +5099,7 @@ local LimitItem
 local Mouse
 local TowerCPS
 local UseJumpAnim -- New toggle for jump animation
+local FastMode -- New toggle for fast mode
 
 -- Pre-calculate adjacent positions
 local adjacent = table.create(26)
@@ -5116,6 +5117,7 @@ local lastpos = Vector3.zero
 local label
 local lastPlace = 0
 local lastJumpAnim = nil -- Track the jump animation
+local lastVelocityTime = 0
 
 -- Optimized corner check using cached unit vectors
 local function nearCorner(poscheck, pos)
@@ -5158,15 +5160,6 @@ local function checkAdjacent(pos)
         end
     end
     return false
-end
-
--- Check if we can build at a position
-local function canBuildAt(pos)
-    local block, blockpos = getPlacedBlock(pos)
-    if block then return false end
-    
-    -- Check if there's a block nearby to build on
-    return checkAdjacent(blockpos) or blockProximity(pos) ~= nil
 end
 
 local function getScaffoldBlock()
@@ -5250,7 +5243,6 @@ Scaffold = vape.Categories.Utility:CreateModule({
                 
                 towerThread = task.spawn(function()
                     local lastBlockPos = nil
-                    local lastVelocityTime = 0
                     
                     while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or
                         (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)) do
@@ -5262,39 +5254,55 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                 if root then
                                     local wool, amount = getScaffoldBlock()
                                     
-                                    -- Check if we can place a block
-                                    local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
-                                    local roundedPos = roundPos(pos)
-                                    local canBuild = false
-                                    
-                                    -- Only do proximity check if position changed
-                                    if lastBlockPos ~= roundedPos then
-                                        local block, blockpos = getPlacedBlock(roundedPos)
-                                        if not block then
-                                            local adjacentBlock = checkAdjacent(blockpos)
-                                            local proximityBlock = blockProximity(pos)
-                                            
-                                            if adjacentBlock or proximityBlock then
-                                                canBuild = true
+                                    -- Place blocks if we have them
+                                    if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                        local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
+                                        local roundedPos = roundPos(pos)
+                                        
+                                        -- Only do proximity check if position changed
+                                        if lastBlockPos ~= roundedPos then
+                                            local block, blockpos = getPlacedBlock(roundedPos)
+                                            if not block then
+                                                local adjacentBlock = checkAdjacent(blockpos)
+                                                local proximityBlock = blockProximity(pos)
                                                 
-                                                -- Place the block if we have wool
-                                                if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                                if adjacentBlock or proximityBlock then
                                                     task.spawn(bedwars.placeBlock, adjacentBlock and blockpos or proximityBlock, wool, false)
                                                     lastPlace = currentTime
                                                     lastBlockPos = roundedPos
+                                                    
+                                                    -- Apply velocity with less restrictive checks in fast mode
+                                                    if FastMode.Enabled or currentTime - lastVelocityTime > 0.1 then
+                                                        root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                                                        lastVelocityTime = currentTime
+                                                        
+                                                        -- Play jump animation
+                                                        if UseJumpAnim.Enabled then
+                                                            playJumpAnimation()
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        else
+                                            -- Even if position hasn't changed, still apply velocity for smoother building
+                                            if FastMode.Enabled and (currentTime - lastVelocityTime > 0.1) then
+                                                root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                                                lastVelocityTime = currentTime
+                                                
+                                                if UseJumpAnim.Enabled then
+                                                    playJumpAnimation()
                                                 end
                                             end
                                         end
-                                    end
-                                    
-                                    -- Only apply velocity if we can build and have blocks
-                                    if canBuild and (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        if currentTime - lastVelocityTime > 0.2 then  -- Limit velocity application
+                                    elseif FastMode.Enabled and (wool or not LimitItem.Enabled) then
+                                        -- In fast mode, still apply velocity even without block checks
+                                        if currentTime - lastVelocityTime > 0.1 then
                                             root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
                                             lastVelocityTime = currentTime
                                             
-                                            -- Play jump animation
-                                            playJumpAnimation()
+                                            if UseJumpAnim.Enabled then
+                                                playJumpAnimation()
+                                            end
                                         end
                                     end
                                 end
@@ -5434,6 +5442,13 @@ UseJumpAnim = Scaffold:CreateToggle({
     Name = 'Use Jump Animation',
     Default = true,
     Tooltip = 'Uses jump animation instead of fall animation'
+})
+
+-- New toggle for fast mode
+FastMode = Scaffold:CreateToggle({
+    Name = 'Fast Mode',
+    Default = true,
+    Tooltip = 'Prioritizes speed over appearance checks'
 })
 
 Count = Scaffold:CreateToggle({
