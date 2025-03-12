@@ -3255,8 +3255,6 @@ local FireWait
 
 local AutoSwitch
 
-local ToolCheck -- New toggle for tool checking
-
 local rayCheck = RaycastParams.new()
 
 rayCheck.FilterType = Enum.RaycastFilterType.Include
@@ -3291,17 +3289,18 @@ end
 local function getProjectiles()
     local items = {}
     for _, item in store.inventory.inventory.items do
-        local proj = bedwars.ItemMeta[item.itemType].projectileSource
+        local itemMeta = bedwars.ItemMeta[item.itemType]
+        local proj = itemMeta and itemMeta.projectileSource
         local ammo = proj and getAmmo(proj)
         if normalMode then
             if ammo and table.find(List.ListEnabled, ammo) then
-                if not ToolCheck.Enabled or not LimitItem.Enabled or hasProjectileEquipped(proj) then
+                if not LimitItem.Enabled or hasProjectileEquipped(proj) then
                     table.insert(items, {item, ammo, proj.projectileType(ammo), proj})
                 end
             end
         else
             if ammo and not table.find(ReverseList.ListEnabled, ammo) then
-                if not ToolCheck.Enabled or not LimitItem.Enabled or hasProjectileEquipped(proj) then
+                if not LimitItem.Enabled or hasProjectileEquipped(proj) then
                     table.insert(items, {item, ammo, proj.projectileType(ammo), proj})
                 end
             end
@@ -3311,15 +3310,17 @@ local function getProjectiles()
     return items
 end
 
--- Improved switchItem function that remembers previous tool
+-- Fixed switchItem function that properly remembers previous tool
 local function switchItem(item)
+    if not item then return false end
+    
     if store.hand.tool and store.hand.tool.Name ~= item.Name then
         print("Switching to:", item.Name)
-        -- Save current tool for switching back
         previousTool = store.hand.tool
         store.hand:EquipTool(item)
         return true
     end
+    
     print("Already equipped:", item.Name)
     return false
 end
@@ -3335,16 +3336,29 @@ local function switchBackToPreviousTool()
     return false
 end
 
-local function switchHotbarItem(item)
-    if item and not hasProjectileEquipped(item) then
-        for i, v in pairs(store.inventory.hotbar) do
-            if v.item and v.item.itemType == item.itemType then
-                if hotbarSwitch(i - 1) then
-                    return true
-                end
+-- Improved switchHotbarItem function that works more reliably
+local function switchHotbarItem(itemType)
+    -- If no item type provided, return false
+    if not itemType then return false end
+    
+    -- Find the item in the hotbar
+    for i, v in pairs(store.inventory.hotbar) do
+        if v.item and v.item.itemType == itemType then
+            -- Store current tool before switching
+            if store.hand.tool then
+                previousTool = store.hand.tool
+            end
+            
+            -- Use the bedwars hotbarSwitch function to switch to the item
+            if hotbarSwitch then
+                print("Switching to hotbar slot:", i-1)
+                hotbarSwitch(i - 1)
+                return true
             end
         end
     end
+    
+    return false
 end
 
 ProjectileAura = vape.Categories.Blatant:CreateModule({
@@ -3363,6 +3377,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                     
                     if ent then
                         local pos = entitylib.character.RootPart.Position
+                        
                         for _, data in getProjectiles() do
                             local item, ammo, projectile, itemMeta = unpack(data)
                             if (FireDelays[item.itemType] or 0) < tick() then
@@ -3377,7 +3392,12 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                     
                                     -- Auto switch system - only switch if AutoSwitch is enabled
                                     if AutoSwitch.Enabled and not hasProjectileEquipped(itemMeta) then
-                                        switched = switchHotbarItem(item.tool)
+                                        -- Use item type directly instead of tool
+                                        switched = switchHotbarItem(item.itemType)
+                                        -- Give a small delay for the switch to register
+                                        if switched then
+                                            task.wait(0.05)
+                                        end
                                     end
                                     
                                     task.spawn(function()
@@ -3396,15 +3416,15 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                                 bedwars.SoundManager:playSound(shoot)
                                             end
                                         end
+                                        
+                                        -- Wait a little bit before switching back
+                                        if switched then
+                                            task.wait(0.1)
+                                            switchBackToPreviousTool()
+                                        end
                                     end)
                                     
                                     FireDelays[item.itemType] = tick() + math.max(itemMeta.fireDelaySec, FireWait.Value)
-                                    
-                                    -- Switch back to previous tool if we switched and AutoSwitch is enabled
-                                    if switched then
-                                        task.wait(0.05)
-                                        switchBackToPreviousTool()
-                                    end
                                 end
                             end
                         end
@@ -3447,12 +3467,6 @@ LimitItem = ProjectileAura:CreateToggle({
     Name = 'Limit to items',
     Default = true,
     Tooltip = 'Only shoots when projectile tools are equipped'
-})
-
-ToolCheck = ProjectileAura:CreateToggle({
-    Name = 'Tool Check',
-    Default = true,
-    Tooltip = 'Only enables items based on tool restrictions'
 })
 
 AutoSwitch = ProjectileAura:CreateToggle({
