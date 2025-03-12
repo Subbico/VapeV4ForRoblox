@@ -3265,8 +3265,11 @@ local FireDelays = {}
 
 local normalMode = true -- Default mode is normal
 
--- Store original tool
-local previousTool = nil
+-- Store original tool information more robustly
+local previousItem = {
+    tool = nil,
+    slot = nil
+}
 
 task.spawn(function()
     projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
@@ -3310,45 +3313,33 @@ local function getProjectiles()
     return items
 end
 
--- Fixed switchItem function that properly remembers previous tool
-local function switchItem(item)
-    if not item then return false end
-    
-    if store.hand.tool and store.hand.tool.Name ~= item.Name then
-        print("Switching to:", item.Name)
-        previousTool = store.hand.tool
-        store.hand:EquipTool(item)
-        return true
+-- Store the current hotbar slot
+local function getCurrentHotbarSlot()
+    if store.hand.tool then
+        for i, v in pairs(store.inventory.hotbar) do
+            if v.item and store.hand.tool.Name == v.item.itemType then
+                return i - 1
+            end
+        end
     end
-    
-    print("Already equipped:", item.Name)
-    return false
+    return nil
 end
 
--- Function to switch back to previous tool
-local function switchBackToPreviousTool()
-    if previousTool then
-        print("Switching back to:", previousTool.Name)
-        store.hand:EquipTool(previousTool)
-        previousTool = nil
-        return true
-    end
-    return false
-end
-
--- Improved switchHotbarItem function that works more reliably
+-- Improved switchHotbarItem function that properly saves the current item
 local function switchHotbarItem(itemType)
     -- If no item type provided, return false
     if not itemType then return false end
     
+    -- First, save the current tool and slot
+    if store.hand.tool then
+        previousItem.tool = store.hand.tool
+        previousItem.slot = getCurrentHotbarSlot()
+        print("Saved original tool:", previousItem.tool.Name, "in slot:", previousItem.slot)
+    end
+    
     -- Find the item in the hotbar
     for i, v in pairs(store.inventory.hotbar) do
         if v.item and v.item.itemType == itemType then
-            -- Store current tool before switching
-            if store.hand.tool then
-                previousTool = store.hand.tool
-            end
-            
             -- Use the bedwars hotbarSwitch function to switch to the item
             if hotbarSwitch then
                 print("Switching to hotbar slot:", i-1)
@@ -3358,6 +3349,28 @@ local function switchHotbarItem(itemType)
         end
     end
     
+    return false
+end
+
+-- Improved function to switch back to previous tool using the slot
+local function switchBackToPreviousTool()
+    if previousItem.slot ~= nil then
+        print("Switching back to slot:", previousItem.slot)
+        hotbarSwitch(previousItem.slot)
+        
+        -- Clear stored item info
+        previousItem.tool = nil
+        previousItem.slot = nil
+        return true
+    elseif previousItem.tool then
+        print("Switching back to:", previousItem.tool.Name)
+        store.hand:EquipTool(previousItem.tool)
+        
+        -- Clear stored item info
+        previousItem.tool = nil
+        previousItem.slot = nil
+        return true
+    end
     return false
 end
 
@@ -3396,7 +3409,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                         switched = switchHotbarItem(item.itemType)
                                         -- Give a small delay for the switch to register
                                         if switched then
-                                            task.wait(0.05)
+                                            task.wait(0.1)
                                         end
                                     end
                                     
@@ -3416,15 +3429,16 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                                 bedwars.SoundManager:playSound(shoot)
                                             end
                                         end
-                                        
-                                        -- Wait a little bit before switching back
-                                        if switched then
-                                            task.wait(0.1)
-                                            switchBackToPreviousTool()
-                                        end
                                     end)
                                     
                                     FireDelays[item.itemType] = tick() + math.max(itemMeta.fireDelaySec, FireWait.Value)
+                                    
+                                    -- Switch back to previous tool if we switched
+                                    if switched then
+                                        -- Give enough time for the projectile to fire
+                                        task.wait(0.2)
+                                        switchBackToPreviousTool()
+                                    end
                                 end
                             end
                         end
