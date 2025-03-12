@@ -3255,6 +3255,8 @@ local FireWait
 
 local AutoSwitch
 
+local AutoTool -- New toggle for automatic tool switching and firing
+
 local rayCheck = RaycastParams.new()
 
 rayCheck.FilterType = Enum.RaycastFilterType.Include
@@ -3263,7 +3265,11 @@ local projectileRemote = {InvokeServer = function() end}
 
 local FireDelays = {}
 
-local normalMode = true  -- Default mode is normal
+local normalMode = true -- Default mode is normal
+
+-- Track original tool for switching back
+local originalTool = nil
+local isFiring = false -- Prevent multiple auto-firing processes at once
 
 task.spawn(function()
     projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
@@ -3288,7 +3294,6 @@ local function getProjectiles()
     for _, item in store.inventory.inventory.items do
         local proj = bedwars.ItemMeta[item.itemType].projectileSource
         local ammo = proj and getAmmo(proj)
-
         if normalMode then
             if ammo and table.find(List.ListEnabled, ammo) then
                 if not LimitItem.Enabled or hasProjectileEquipped(proj) then
@@ -3307,22 +3312,49 @@ local function getProjectiles()
     return items
 end
 
+-- Improved function to find and switch to the best projectile tool
+local function findBestProjectileTool()
+    local bestItem = nil
+    local bestAmmo = nil
+    local bestProjectile = nil
+    local bestItemMeta = nil
+    
+    for _, data in getProjectiles() do
+        local item, ammo, projectile, itemMeta = unpack(data)
+        -- If we haven't found an item yet or this one has a shorter fire delay
+        if not bestItem or (itemMeta.fireDelaySec or 0) < (bestItemMeta.fireDelaySec or 0) then
+            bestItem = item
+            bestAmmo = ammo
+            bestProjectile = projectile
+            bestItemMeta = itemMeta
+        end
+    end
+    
+    return bestItem, bestAmmo, bestProjectile, bestItemMeta
+end
+
 local function switchItem(item)
+    if not item then return false end
+    
+    -- Save current tool before switching
     if store.hand.tool and store.hand.tool.Name ~= item.Name then
+        originalTool = store.hand.tool
+        print("Saving original tool:", originalTool.Name)
+        
         print("Switching to:", item.Name)
-        store.hand.previousTool = store.hand.tool
         store.hand:EquipTool(item)
         return true
     end
+    
     print("Already equipped:", item.Name)
     return false
 end
 
 local function switchBackToPreviousTool()
-    if store.hand.previousTool then
-        print("Switching back to:", store.hand.previousTool.Name)
-        store.hand:EquipTool(store.hand.previousTool)
-        store.hand.previousTool = nil
+    if originalTool then
+        print("Switching back to:", originalTool.Name)
+        store.hand:EquipTool(originalTool)
+        originalTool = nil
     end
 end
 
@@ -3335,6 +3367,80 @@ local function switchHotbarItem(item)
                 end
             end
         end
+    end
+end
+
+-- New function to automatically fire a projectile with tool switching
+local function autoFireProjectile(ent)
+    if isFiring then return end
+    isFiring = true
+    
+    -- Save current tool
+    originalTool = store.hand.tool
+    
+    -- Find the best projectile to use
+    local bestItem, bestAmmo, bestProjectile, bestItemMeta = findBestProjectileTool()
+    
+    if bestItem and bestAmmo and bestProjectile and bestItemMeta then
+        local pos = entitylib.character.RootPart.Position
+        
+        -- Switch to the projectile tool
+        local switched = false
+        if not hasProjectileEquipped(bestItemMeta) then
+            switched = switchHotbarItem(bestItem.tool)
+        end
+        
+        -- Small delay to ensure tool switch completes
+        task.wait(0.05)
+        
+        rayCheck.FilterDescendantsInstances = {workspace.Map}
+        local meta = bedwars.ProjectileMeta[bestProjectile]
+        local projSpeed, gravity = meta.launchVelocity, meta.gravitationalAcceleration or 196.2
+        local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, ent.RootPart.Position, ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight, ent.Jumping and 42.6 or nil, rayCheck)
+        
+        if calc then
+            targetinfo.Targets[ent] = tick() + 1
+            
+            task.spawn(function()
+                local dir, id = CFrame.lookAt(pos, calc).LookVector, httpService:GenerateGUID(true)
+                local shootPosition = (CFrame.new(pos, calc) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))).Position
+                
+                bedwars.ProjectileController:createLocalProjectile(meta, bestAmmo, bestProjectile, shootPosition, id, dir * projSpeed, {drawDurationSeconds = 1})
+                local res = projectileRemote:InvokeServer(bestItem.tool, bestAmmo, bestProjectile, shootPosition, pos, dir * projSpeed, id, {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)}, workspace:GetServerTimeNow() - 0.045)
+                
+                if not res then
+                    FireDelays[bestItem.itemType] = tick()
+                else
+                    local shoot = bestItemMeta.launchSound
+                    shoot = shoot and shoot[math.random(1, #shoot)] or nil
+                    if shoot then
+                        bedwars.SoundManager:playSound(shoot)
+                    end
+                end
+                
+                FireDelays[bestItem.itemType] = tick() + math.max(bestItemMeta.fireDelaySec, FireWait.Value)
+                
+                -- Wait before switching back
+                task.wait(0.1)
+                
+                -- Switch back to original tool
+                if switched or originalTool then
+                    switchBackToPreviousTool()
+                end
+                
+                -- Reset firing state
+                isFiring = false
+            end)
+        else
+            -- If calculation failed, reset state
+            if switched or originalTool then
+                switchBackToPreviousTool()
+            end
+            isFiring = false
+        end
+    else
+        -- No projectile found, reset state
+        isFiring = false
     end
 end
 
@@ -3351,55 +3457,62 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                         NPCs = Targets.NPCs.Enabled,
                         Wallcheck = Targets.Walls.Enabled
                     })
-
+                    
                     if ent then
                         local pos = entitylib.character.RootPart.Position
-                        for _, data in getProjectiles() do
-                            local item, ammo, projectile, itemMeta = unpack(data)
-                            if (FireDelays[item.itemType] or 0) < tick() then
-                                rayCheck.FilterDescendantsInstances = {workspace.Map}
-                                local meta = bedwars.ProjectileMeta[projectile]
-                                local projSpeed, gravity = meta.launchVelocity, meta.gravitationalAcceleration or 196.2
-                                local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, ent.RootPart.Position, ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight, ent.Jumping and 42.6 or nil, rayCheck)
-
-                                if calc then
-                                    targetinfo.Targets[ent] = tick() + 1
-                                    local switched = false
-
-                                    if AutoSwitch.Enabled and not hasProjectileEquipped(itemMeta) then
-                                        switched = switchHotbarItem(item.tool)
-                                    end
-
-                                    task.spawn(function()
-                                        local dir, id = CFrame.lookAt(pos, calc).LookVector, httpService:GenerateGUID(true)
-                                        local shootPosition = (CFrame.new(pos, calc) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))).Position
-
-                                        bedwars.ProjectileController:createLocalProjectile(meta, ammo, projectile, shootPosition, id, dir * projSpeed, {drawDurationSeconds = 1})
-
-                                        local res = projectileRemote:InvokeServer(item.tool, ammo, projectile, shootPosition, pos, dir * projSpeed, id, {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)}, workspace:GetServerTimeNow() - 0.045)
-
-                                        if not res then
-                                            FireDelays[item.itemType] = tick()
-                                        else
-                                            local shoot = itemMeta.launchSound
-                                            shoot = shoot and shoot[math.random(1, #shoot)] or nil
-                                            if shoot then
-                                                bedwars.SoundManager:playSound(shoot)
-                                            end
+                        
+                        -- If AutoTool is enabled, use that instead of regular logic
+                        if AutoTool.Enabled then
+                            autoFireProjectile(ent)
+                        else
+                            -- Original logic
+                            for _, data in getProjectiles() do
+                                local item, ammo, projectile, itemMeta = unpack(data)
+                                if (FireDelays[item.itemType] or 0) < tick() then
+                                    rayCheck.FilterDescendantsInstances = {workspace.Map}
+                                    local meta = bedwars.ProjectileMeta[projectile]
+                                    local projSpeed, gravity = meta.launchVelocity, meta.gravitationalAcceleration or 196.2
+                                    local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, ent.RootPart.Position, ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight, ent.Jumping and 42.6 or nil, rayCheck)
+                                    
+                                    if calc then
+                                        targetinfo.Targets[ent] = tick() + 1
+                                        local switched = false
+                                        
+                                        if AutoSwitch.Enabled and not hasProjectileEquipped(itemMeta) then
+                                            switched = switchHotbarItem(item.tool)
                                         end
-                                    end)
-
-                                    FireDelays[item.itemType] = tick() + math.max(itemMeta.fireDelaySec, FireWait.Value)
-
-                                    if switched then
-                                        task.wait(0.05)
-                                        switchBackToPreviousTool()
+                                        
+                                        task.spawn(function()
+                                            local dir, id = CFrame.lookAt(pos, calc).LookVector, httpService:GenerateGUID(true)
+                                            local shootPosition = (CFrame.new(pos, calc) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))).Position
+                                            
+                                            bedwars.ProjectileController:createLocalProjectile(meta, ammo, projectile, shootPosition, id, dir * projSpeed, {drawDurationSeconds = 1})
+                                            local res = projectileRemote:InvokeServer(item.tool, ammo, projectile, shootPosition, pos, dir * projSpeed, id, {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)}, workspace:GetServerTimeNow() - 0.045)
+                                            
+                                            if not res then
+                                                FireDelays[item.itemType] = tick()
+                                            else
+                                                local shoot = itemMeta.launchSound
+                                                shoot = shoot and shoot[math.random(1, #shoot)] or nil
+                                                if shoot then
+                                                    bedwars.SoundManager:playSound(shoot)
+                                                end
+                                            end
+                                        end)
+                                        
+                                        FireDelays[item.itemType] = tick() + math.max(itemMeta.fireDelaySec, FireWait.Value)
+                                        
+                                        if switched then
+                                            task.wait(0.05)
+                                            switchBackToPreviousTool()
+                                        end
                                     end
                                 end
                             end
                         end
                     end
                 end
+                
                 task.wait(0.1)
             until not ProjectileAura.Enabled
         end
@@ -3419,7 +3532,7 @@ List = ProjectileAura:CreateTextList({
 
 ReverseList = ProjectileAura:CreateTextList({
     Name = 'Reverse Projectiles',
-    Default = {}  -- Add default projectiles to exclude in reverse mode if needed
+    Default = {} -- Add default projectiles to exclude in reverse mode if needed
 })
 
 Range = ProjectileAura:CreateSlider({
@@ -3444,6 +3557,13 @@ AutoSwitch = ProjectileAura:CreateToggle({
     Tooltip = 'Automatically switches to the projectile tool'
 })
 
+-- New AutoTool toggle
+AutoTool = ProjectileAura:CreateToggle({
+    Name = 'Auto Tool',
+    Default = false,
+    Tooltip = 'Automatically switches to best projectile, fires, and switches back'
+})
+
 FireWait = ProjectileAura:CreateSlider({
     Name = 'Fire Wait',
     Min = 1,
@@ -3463,6 +3583,7 @@ ProjectileAura:CreateToggle({
         print("Mode switched to:", mode)
     end
 })	
+
 run(function()
 	local BedESP
 	local Reference = {}
