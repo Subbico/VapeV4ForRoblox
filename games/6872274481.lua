@@ -3296,7 +3296,7 @@ local function isHoldingBlock()
     return itemMeta and itemMeta.block ~= nil
 end
 
--- Enhanced function to check if player is holding any breaking tool
+-- Refined function to check if player is holding a breaking tool (excluding swords)
 local function isHoldingBreakingTool()
     if not store.hand.tool then return false end
     
@@ -3304,25 +3304,19 @@ local function isHoldingBreakingTool()
     local itemMeta = bedwars.ItemMeta[store.hand.tool.Name]
     if not itemMeta then return false end
     
-    -- Check for any property that indicates it can break blocks
+    -- Skip if it's a sword
+    if itemMeta.sword then return false end
+    
+    -- Check for specific breaking tool properties
     if itemMeta.breakType then return true end
     
-    -- Check if it's in the tools table (which contains breaking tools)
-    for _, tool in pairs(store.tools or {}) do
-        if tool.itemType == store.hand.tool.Name then
-            return true
-        end
-    end
-    
-    -- Check for specific tool categories
-    if itemMeta.sword or itemMeta.pickaxe or itemMeta.axe or 
-       itemMeta.shears or itemMeta.hammer then
+    -- Check for specific tool categories (excluding swords)
+    if itemMeta.pickaxe or itemMeta.axe or itemMeta.shears or itemMeta.hammer then
         return true
     end
     
-    -- Check for specific item types that are known to break blocks
+    -- Check for specific breaking tools
     local breakingItems = {
-        "stone_sword", "iron_sword", "diamond_sword", "emerald_sword",
         "wood_pickaxe", "stone_pickaxe", "iron_pickaxe", "diamond_pickaxe",
         "wood_axe", "stone_axe", "iron_axe", "diamond_axe",
         "shears", "hammer"
@@ -3330,6 +3324,13 @@ local function isHoldingBreakingTool()
     
     for _, item in ipairs(breakingItems) do
         if store.hand.tool.Name == item then
+            return true
+        end
+    end
+    
+    -- Check if it's in the tools table but not a sword
+    for toolType, tool in pairs(store.tools or {}) do
+        if tool.itemType == store.hand.tool.Name and toolType ~= "sword" then
             return true
         end
     end
@@ -3450,7 +3451,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                     
                                     -- Auto switch system - only switch if AutoSwitch is enabled and not holding blocks or breaking tools
                                     if AutoSwitch.Enabled and not hasProjectileEquipped(itemMeta) then
-                                        -- Check if player is holding a block or breaking tool
+                                        -- Check if player is holding a block or breaking tool (excluding swords)
                                         if not isHoldingBlock() and not isHoldingBreakingTool() then
                                             -- Use item type directly instead of tool
                                             switched = switchHotbarItem(item.itemType)
