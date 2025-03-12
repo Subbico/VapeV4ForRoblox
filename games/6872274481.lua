@@ -3245,6 +3245,10 @@ local Targets
 
 local Range
 
+local List
+
+local ReverseList
+
 local LimitItem
 
 local FireWait
@@ -3259,7 +3263,7 @@ local projectileRemote = {InvokeServer = function() end}
 
 local FireDelays = {}
 
-local normalMode = true -- Default mode is normal
+local normalMode = true  -- Default mode is normal
 
 task.spawn(function()
     projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
@@ -3284,9 +3288,15 @@ local function getProjectiles()
     for _, item in store.inventory.inventory.items do
         local proj = bedwars.ItemMeta[item.itemType].projectileSource
         local ammo = proj and getAmmo(proj)
-        if ammo then
-            if (normalMode and table.find(List.ListEnabled, ammo)) or 
-               (not normalMode and not table.find(ReverseList.ListEnabled, ammo)) then
+
+        if normalMode then
+            if ammo and table.find(List.ListEnabled, ammo) then
+                if not LimitItem.Enabled or hasProjectileEquipped(proj) then
+                    table.insert(items, {item, ammo, proj.projectileType(ammo), proj})
+                end
+            end
+        else
+            if ammo and not table.find(ReverseList.ListEnabled, ammo) then
                 if not LimitItem.Enabled or hasProjectileEquipped(proj) then
                     table.insert(items, {item, ammo, proj.projectileType(ammo), proj})
                 end
@@ -3341,6 +3351,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                         NPCs = Targets.NPCs.Enabled,
                         Wallcheck = Targets.Walls.Enabled
                     })
+
                     if ent then
                         local pos = entitylib.character.RootPart.Position
                         for _, data in getProjectiles() do
@@ -3350,17 +3361,23 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                 local meta = bedwars.ProjectileMeta[projectile]
                                 local projSpeed, gravity = meta.launchVelocity, meta.gravitationalAcceleration or 196.2
                                 local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, ent.RootPart.Position, ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight, ent.Jumping and 42.6 or nil, rayCheck)
+
                                 if calc then
                                     targetinfo.Targets[ent] = tick() + 1
                                     local switched = false
+
                                     if AutoSwitch.Enabled and not hasProjectileEquipped(itemMeta) then
                                         switched = switchHotbarItem(item.tool)
                                     end
+
                                     task.spawn(function()
                                         local dir, id = CFrame.lookAt(pos, calc).LookVector, httpService:GenerateGUID(true)
                                         local shootPosition = (CFrame.new(pos, calc) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))).Position
+
                                         bedwars.ProjectileController:createLocalProjectile(meta, ammo, projectile, shootPosition, id, dir * projSpeed, {drawDurationSeconds = 1})
+
                                         local res = projectileRemote:InvokeServer(item.tool, ammo, projectile, shootPosition, pos, dir * projSpeed, id, {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)}, workspace:GetServerTimeNow() - 0.045)
+
                                         if not res then
                                             FireDelays[item.itemType] = tick()
                                         else
@@ -3371,7 +3388,9 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                             end
                                         end
                                     end)
+
                                     FireDelays[item.itemType] = tick() + math.max(itemMeta.fireDelaySec, FireWait.Value)
+
                                     if switched then
                                         task.wait(0.05)
                                         switchBackToPreviousTool()
@@ -3395,12 +3414,12 @@ Targets = ProjectileAura:CreateTargets({
 
 List = ProjectileAura:CreateTextList({
     Name = 'Projectiles',
-    Default = {} -- Empty by default to dynamically handle all projectiles
+    Default = {'arrow', 'snowball'}
 })
 
 ReverseList = ProjectileAura:CreateTextList({
     Name = 'Reverse Projectiles',
-    Default = {} -- Add default projectiles to exclude in reverse mode if needed
+    Default = {}  -- Add default projectiles to exclude in reverse mode if needed
 })
 
 Range = ProjectileAura:CreateSlider({
@@ -3421,7 +3440,7 @@ LimitItem = ProjectileAura:CreateToggle({
 
 AutoSwitch = ProjectileAura:CreateToggle({
     Name = 'Auto Switch',
-    Default = true,
+    Default = false,
     Tooltip = 'Automatically switches to the projectile tool'
 })
 
@@ -5098,8 +5117,6 @@ local Diagonal
 local LimitItem
 local Mouse
 local TowerCPS
-local UseJumpAnim -- New toggle for jump animation
-local FastMode -- New toggle for fast mode
 
 -- Pre-calculate adjacent positions
 local adjacent = table.create(26)
@@ -5116,8 +5133,6 @@ end
 local lastpos = Vector3.zero
 local label
 local lastPlace = 0
-local lastJumpAnim = nil -- Track the jump animation
-local lastVelocityTime = 0
 
 -- Optimized corner check using cached unit vectors
 local function nearCorner(poscheck, pos)
@@ -5140,6 +5155,7 @@ local function blockProximity(pos)
     local startPos = bedwars.BlockController:getBlockPosition(pos - Vector3.new(15, 15, 15))
     local endPos = bedwars.BlockController:getBlockPosition(pos + Vector3.new(15, 15, 15))
     local blocks = getBlocksInPoints(startPos, endPos)
+    
     for i = 1, #blocks do
         local blockpos = nearCorner(blocks[i], pos)
         local newmag = (pos - blockpos).Magnitude
@@ -5179,80 +5195,33 @@ local function getScaffoldBlock()
     return nil, 0
 end
 
--- Function to play jump animation
-local function playJumpAnimation()
-    if not UseJumpAnim.Enabled or not entitylib.isAlive then return end
-    
-    local humanoid = entitylib.character.Humanoid
-    if not humanoid then return end
-    
-    -- Get the jump animation
-    local animator = humanoid:FindFirstChildOfClass("Animator")
-    if not animator then return end
-    
-    -- Find or create jump animation
-    if not lastJumpAnim then
-        for _, track in pairs(animator:GetPlayingAnimationTracks()) do
-            if track.Name:find("Jump") then
-                lastJumpAnim = track
-                break
-            end
-        end
-        
-        if not lastJumpAnim then
-            -- Try to find the jump animation in the humanoid
-            for _, anim in pairs(humanoid:GetPlayingAnimationTracks()) do
-                if anim.Name:find("Jump") then
-                    lastJumpAnim = anim
-                    break
-                end
-            end
-        end
-        
-        -- If still not found, create a new one
-        if not lastJumpAnim and humanoid:FindFirstChild("Animate") then
-            local animate = humanoid.Animate
-            if animate:FindFirstChild("jump") then
-                local jumpAnim = animate.jump:FindFirstChildOfClass("Animation")
-                if jumpAnim then
-                    lastJumpAnim = animator:LoadAnimation(jumpAnim)
-                end
-            end
-        end
-    end
-    
-    -- Play the jump animation
-    if lastJumpAnim and not lastJumpAnim.IsPlaying then
-        lastJumpAnim:Play()
-    end
-end
-
 Scaffold = vape.Categories.Utility:CreateModule({
     Name = 'Scaffold',
     Function = function(callback)
         if label then
             label.Visible = callback
         end
-        
+
         if callback then
             local towerThread
             
             -- Fast tower building with CPS
             local function startTowerBuild()
                 if towerThread then return end
-                
                 towerThread = task.spawn(function()
                     local lastBlockPos = nil
-                    
-                    while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or
+                    while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or 
                         (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)) do
                         local currentTime = tick()
-                        
                         if currentTime - lastPlace >= (1 / TowerCPS.GetRandomValue()) then
                             if entitylib.isAlive then
                                 local root = entitylib.character.RootPart
                                 if root then
-                                    local wool, amount = getScaffoldBlock()
+                                    local wool = getScaffoldBlock()
+                                    -- Only apply velocity if we have blocks or LimitItem is off
+                                    if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                        root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                                    end
                                     
                                     -- Place blocks if we have them
                                     if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
@@ -5263,55 +5232,20 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                         if lastBlockPos ~= roundedPos then
                                             local block, blockpos = getPlacedBlock(roundedPos)
                                             if not block then
-                                                local adjacentBlock = checkAdjacent(blockpos)
-                                                local proximityBlock = blockProximity(pos)
-                                                
-                                                if adjacentBlock or proximityBlock then
-                                                    task.spawn(bedwars.placeBlock, adjacentBlock and blockpos or proximityBlock, wool, false)
+                                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(pos)
+                                                if blockpos then
+                                                    task.spawn(bedwars.placeBlock, blockpos, wool, false)
                                                     lastPlace = currentTime
                                                     lastBlockPos = roundedPos
-                                                    
-                                                    -- Apply velocity with less restrictive checks in fast mode
-                                                    if FastMode.Enabled or currentTime - lastVelocityTime > 0.1 then
-                                                        root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
-                                                        lastVelocityTime = currentTime
-                                                        
-                                                        -- Play jump animation
-                                                        if UseJumpAnim.Enabled then
-                                                            playJumpAnimation()
-                                                        end
-                                                    end
                                                 end
-                                            end
-                                        else
-                                            -- Even if position hasn't changed, still apply velocity for smoother building
-                                            if FastMode.Enabled and (currentTime - lastVelocityTime > 0.1) then
-                                                root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
-                                                lastVelocityTime = currentTime
-                                                
-                                                if UseJumpAnim.Enabled then
-                                                    playJumpAnimation()
-                                                end
-                                            end
-                                        end
-                                    elseif FastMode.Enabled and (wool or not LimitItem.Enabled) then
-                                        -- In fast mode, still apply velocity even without block checks
-                                        if currentTime - lastVelocityTime > 0.1 then
-                                            root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
-                                            lastVelocityTime = currentTime
-                                            
-                                            if UseJumpAnim.Enabled then
-                                                playJumpAnimation()
                                             end
                                         end
                                     end
                                 end
                             end
                         end
-                        
                         task.wait(0.01)
                     end
-                    
                     towerThread = nil
                 end)
             end
@@ -5351,28 +5285,29 @@ Scaffold = vape.Categories.Utility:CreateModule({
                     end
                 end)
             end
-            
+
             -- Main scaffold loop
             repeat
                 if entitylib.isAlive then
                     local wool, amount = getScaffoldBlock()
+
                     if Mouse.Enabled and not inputService:IsMouseButtonPressed(0) then
                         wool = nil
                     end
-                    
+
                     if label then
                         amount = amount or 0
                         label.Text = amount..' <font color="rgb(170, 170, 170)">(Scaffold)</font>'
                         label.TextColor3 = Color3.fromHSV((amount / 128) / 2.8, 0.86, 1)
                     end
-                    
+
                     if wool then
                         local root = entitylib.character.RootPart
                         local moveDir = entitylib.character.Humanoid.MoveDirection
                         local hipHeight = entitylib.character.HipHeight
                         local downOffset = Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5
                         local basePos = root.Position - Vector3.new(0, hipHeight + downOffset, 0)
-                        
+
                         for i = Expand.Value, 1, -1 do
                             local currentpos = roundPos(basePos + moveDir * (i * 3))
                             
@@ -5380,33 +5315,28 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                 local angle = math.abs(math.round(math.deg(math.atan2(-moveDir.X, -moveDir.Z)) / 45) * 45)
                                 if angle % 90 == 45 then
                                     local dt = (lastpos - currentpos)
-                                    if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and
-                                        ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
+                                    if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and 
+                                       ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
                                         currentpos = lastpos
                                     end
                                 end
                             end
-                            
+
                             local block, blockpos = getPlacedBlock(currentpos)
                             if not block then
-                                local adjacentBlock = checkAdjacent(blockpos)
-                                local proximityBlock = blockProximity(currentpos)
-                                
-                                if adjacentBlock or proximityBlock then
-                                    task.spawn(bedwars.placeBlock, adjacentBlock and blockpos or proximityBlock, wool, false)
+                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
+                                if blockpos then
+                                    task.spawn(bedwars.placeBlock, blockpos, wool, false)
                                 end
                             end
-                            
                             lastpos = currentpos
                         end
                     end
                 end
-                
                 task.wait(0.01)
             until not Scaffold.Enabled
         else
             Label = nil
-            lastJumpAnim = nil
         end
     end,
     Tooltip = 'Helps you make bridges/scaffold walk.'
@@ -5434,22 +5364,7 @@ Diagonal = Scaffold:CreateToggle({
 })
 
 LimitItem = Scaffold:CreateToggle({Name = 'Limit to items'})
-
 Mouse = Scaffold:CreateToggle({Name = 'Require mouse down'})
-
--- New toggle for using jump animation
-UseJumpAnim = Scaffold:CreateToggle({
-    Name = 'Use Jump Animation',
-    Default = true,
-    Tooltip = 'Uses jump animation instead of fall animation'
-})
-
--- New toggle for fast mode
-FastMode = Scaffold:CreateToggle({
-    Name = 'Fast Mode',
-    Default = true,
-    Tooltip = 'Prioritizes speed over appearance checks'
-})
 
 Count = Scaffold:CreateToggle({
     Name = 'Block Count',
