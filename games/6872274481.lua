@@ -3289,6 +3289,20 @@ local function hasProjectileEquipped(check)
     return itemMeta and itemMeta.projectileSource == check
 end
 
+-- Function to check if player is holding a block
+local function isHoldingBlock()
+    if not store.hand.tool then return false end
+    local itemMeta = bedwars.ItemMeta[store.hand.tool.Name]
+    return itemMeta and itemMeta.block ~= nil
+end
+
+-- Function to check if player is holding a breaking tool
+local function isHoldingBreakingTool()
+    if not store.hand.tool then return false end
+    local itemMeta = bedwars.ItemMeta[store.hand.tool.Name]
+    return itemMeta and itemMeta.breakType ~= nil
+end
+
 local function getProjectiles()
     local items = {}
     for _, item in store.inventory.inventory.items do
@@ -3357,7 +3371,6 @@ local function switchBackToPreviousTool()
     if previousItem.slot ~= nil then
         print("Switching back to slot:", previousItem.slot)
         hotbarSwitch(previousItem.slot)
-        
         -- Clear stored item info
         previousItem.tool = nil
         previousItem.slot = nil
@@ -3365,7 +3378,6 @@ local function switchBackToPreviousTool()
     elseif previousItem.tool then
         print("Switching back to:", previousItem.tool.Name)
         store.hand:EquipTool(previousItem.tool)
-        
         -- Clear stored item info
         previousItem.tool = nil
         previousItem.slot = nil
@@ -3390,7 +3402,6 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                     
                     if ent then
                         local pos = entitylib.character.RootPart.Position
-                        
                         for _, data in getProjectiles() do
                             local item, ammo, projectile, itemMeta = unpack(data)
                             if (FireDelays[item.itemType] or 0) < tick() then
@@ -3403,13 +3414,19 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                     targetinfo.Targets[ent] = tick() + 1
                                     local switched = false
                                     
-                                    -- Auto switch system - only switch if AutoSwitch is enabled
+                                    -- Auto switch system - only switch if AutoSwitch is enabled and not holding blocks or breaking tools
                                     if AutoSwitch.Enabled and not hasProjectileEquipped(itemMeta) then
-                                        -- Use item type directly instead of tool
-                                        switched = switchHotbarItem(item.itemType)
-                                        -- Give a small delay for the switch to register
-                                        if switched then
-                                            task.wait(0.1)
+                                        -- Check if player is holding a block or breaking tool
+                                        if not isHoldingBlock() and not isHoldingBreakingTool() then
+                                            -- Use item type directly instead of tool
+                                            switched = switchHotbarItem(item.itemType)
+                                            
+                                            -- Give a small delay for the switch to register
+                                            if switched then
+                                                task.wait(0.1)
+                                            end
+                                        else
+                                            print("Auto switch prevented: Holding block or breaking tool")
                                         end
                                     end
                                     
@@ -3486,7 +3503,7 @@ LimitItem = ProjectileAura:CreateToggle({
 AutoSwitch = ProjectileAura:CreateToggle({
     Name = 'Auto Switch',
     Default = false,
-    Tooltip = 'Automatically switches to the projectile tool and back'
+    Tooltip = 'Automatically switches to the projectile tool and back (except when holding blocks or breaking tools)'
 })
 
 FireWait = ProjectileAura:CreateSlider({
