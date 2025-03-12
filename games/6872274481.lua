@@ -3240,29 +3240,21 @@ run(function()
 end)
 	
 local ProjectileAura
-
 local Targets
-
 local Range
-
 local List
-
 local ReverseList
-
 local LimitItem
-
 local FireWait
-
 local AutoSwitch
+local IgnoreList
 
 local rayCheck = RaycastParams.new()
-
 rayCheck.FilterType = Enum.RaycastFilterType.Include
+rayCheck.FilterDescendantsInstances = {workspace:FindFirstChild('Map')}
 
 local projectileRemote = {InvokeServer = function() end}
-
 local FireDelays = {}
-
 local normalMode = true -- Default mode is normal
 
 -- Store original tool information more robustly
@@ -3289,6 +3281,12 @@ local function hasProjectileEquipped(check)
     return itemMeta and itemMeta.projectileSource == check
 end
 
+-- Function to check if current item is in ignore list
+local function isItemInIgnoreList()
+    if not store.hand.tool then return false end
+    return table.find(IgnoreList.ListEnabled, store.hand.tool.Name) ~= nil
+end
+
 -- Function to check if player is holding a block
 local function isHoldingBlock()
     if not store.hand.tool then return false end
@@ -3300,22 +3298,19 @@ end
 local function isHoldingBreakingTool()
     if not store.hand.tool then return false end
     
-    -- Get the item metadata
+    -- First check if item is in ignore list
+    if isItemInIgnoreList() then
+        return true
+    end
+    
     local itemMeta = bedwars.ItemMeta[store.hand.tool.Name]
     if not itemMeta then return false end
-    
-    -- Skip if it's a sword
     if itemMeta.sword then return false end
-    
-    -- Check for specific breaking tool properties
     if itemMeta.breakType then return true end
-    
-    -- Check for specific tool categories (excluding swords)
     if itemMeta.pickaxe or itemMeta.axe or itemMeta.shears or itemMeta.hammer then
         return true
     end
     
-    -- Check for specific breaking tools
     local breakingItems = {
         "wood_pickaxe", "stone_pickaxe", "iron_pickaxe", "diamond_pickaxe",
         "wood_axe", "stone_axe", "iron_axe", "diamond_axe",
@@ -3328,7 +3323,6 @@ local function isHoldingBreakingTool()
         end
     end
     
-    -- Check if it's in the tools table but not a sword
     for toolType, tool in pairs(store.tools or {}) do
         if tool.itemType == store.hand.tool.Name and toolType ~= "sword" then
             return true
@@ -3358,7 +3352,6 @@ local function getProjectiles()
             end
         end
     end
-    print("Get Projectiles:", #items)
     return items
 end
 
@@ -3376,44 +3369,33 @@ end
 
 -- Improved switchHotbarItem function that properly saves the current item
 local function switchHotbarItem(itemType)
-    -- If no item type provided, return false
     if not itemType then return false end
     
-    -- First, save the current tool and slot
     if store.hand.tool then
         previousItem.tool = store.hand.tool
         previousItem.slot = getCurrentHotbarSlot()
-        print("Saved original tool:", previousItem.tool.Name, "in slot:", previousItem.slot)
     end
     
-    -- Find the item in the hotbar
     for i, v in pairs(store.inventory.hotbar) do
         if v.item and v.item.itemType == itemType then
-            -- Use the bedwars hotbarSwitch function to switch to the item
             if hotbarSwitch then
-                print("Switching to hotbar slot:", i-1)
                 hotbarSwitch(i - 1)
                 return true
             end
         end
     end
-    
     return false
 end
 
 -- Improved function to switch back to previous tool using the slot
 local function switchBackToPreviousTool()
     if previousItem.slot ~= nil then
-        print("Switching back to slot:", previousItem.slot)
         hotbarSwitch(previousItem.slot)
-        -- Clear stored item info
         previousItem.tool = nil
         previousItem.slot = nil
         return true
     elseif previousItem.tool then
-        print("Switching back to:", previousItem.tool.Name)
         store.hand:EquipTool(previousItem.tool)
-        -- Clear stored item info
         previousItem.tool = nil
         previousItem.slot = nil
         return true
@@ -3434,44 +3416,84 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                         NPCs = Targets.NPCs.Enabled,
                         Wallcheck = Targets.Walls.Enabled
                     })
-                    
+
                     if ent then
                         local pos = entitylib.character.RootPart.Position
                         for _, data in getProjectiles() do
                             local item, ammo, projectile, itemMeta = unpack(data)
+                            
                             if (FireDelays[item.itemType] or 0) < tick() then
                                 rayCheck.FilterDescendantsInstances = {workspace.Map}
                                 local meta = bedwars.ProjectileMeta[projectile]
-                                local projSpeed, gravity = meta.launchVelocity, meta.gravitationalAcceleration or 196.2
-                                local calc = prediction.SolveTrajectory(pos, projSpeed, gravity, ent.RootPart.Position, ent.RootPart.Velocity, workspace.Gravity, ent.HipHeight, ent.Jumping and 42.6 or nil, rayCheck)
+                                local projSpeed = meta.launchVelocity
+                                local gravity = (meta.gravitationalAcceleration or 196.2)
                                 
+                                -- Enhanced prediction logic
+                                local balloons = ent.Character:GetAttribute('InflatedBalloons')
+                                local playerGravity = workspace.Gravity
+                                
+                                if balloons and balloons > 0 then
+                                    playerGravity = (workspace.Gravity * (1 - ((balloons >= 4 and 1.2 or balloons >= 3 and 1 or 0.975))))
+                                end
+                                
+                                if ent.Character.PrimaryPart:FindFirstChild('rbxassetid://8200754399') then
+                                    playerGravity = 6
+                                end
+
+                                local shootPosition = pos + (projectile == 'owl_projectile' and Vector3.zero or itemMeta.fromPositionOffset or Vector3.zero)
+                                local targetPos = ent.RootPart.Position
+                                
+                                local calc = prediction.SolveTrajectory(
+                                    shootPosition,
+                                    projSpeed,
+                                    gravity,
+                                    targetPos,
+                                    projectile == 'telepearl' and Vector3.zero or ent.RootPart.Velocity,
+                                    playerGravity,
+                                    ent.HipHeight,
+                                    ent.Jumping and 42.6 or nil,
+                                    rayCheck
+                                )
+
                                 if calc then
                                     targetinfo.Targets[ent] = tick() + 1
                                     local switched = false
-                                    
-                                    -- Auto switch system - only switch if AutoSwitch is enabled and not holding blocks or breaking tools
+
                                     if AutoSwitch.Enabled and not hasProjectileEquipped(itemMeta) then
-                                        -- Check if player is holding a block or breaking tool (excluding swords)
                                         if not isHoldingBlock() and not isHoldingBreakingTool() then
-                                            -- Use item type directly instead of tool
                                             switched = switchHotbarItem(item.itemType)
-                                            
-                                            -- Give a small delay for the switch to register
                                             if switched then
                                                 task.wait(0.1)
                                             end
-                                        else
-                                            print("Auto switch prevented: Holding block or breaking tool")
                                         end
                                     end
-                                    
+
                                     task.spawn(function()
-                                        local dir, id = CFrame.lookAt(pos, calc).LookVector, httpService:GenerateGUID(true)
-                                        local shootPosition = (CFrame.new(pos, calc) * CFrame.new(Vector3.new(-bedwars.BowConstantsTable.RelX, -bedwars.BowConstantsTable.RelY, -bedwars.BowConstantsTable.RelZ))).Position
+                                        local dir = CFrame.lookAt(shootPosition, calc).LookVector
+                                        local id = httpService:GenerateGUID(true)
                                         
-                                        bedwars.ProjectileController:createLocalProjectile(meta, ammo, projectile, shootPosition, id, dir * projSpeed, {drawDurationSeconds = 1})
-                                        local res = projectileRemote:InvokeServer(item.tool, ammo, projectile, shootPosition, pos, dir * projSpeed, id, {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)}, workspace:GetServerTimeNow() - 0.045)
-                                        
+                                        bedwars.ProjectileController:createLocalProjectile(
+                                            meta,
+                                            ammo,
+                                            projectile,
+                                            shootPosition,
+                                            id,
+                                            dir * projSpeed,
+                                            {drawDurationSeconds = 1}
+                                        )
+
+                                        local res = projectileRemote:InvokeServer(
+                                            item.tool,
+                                            ammo,
+                                            projectile,
+                                            shootPosition,
+                                            pos,
+                                            dir * projSpeed,
+                                            id,
+                                            {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)},
+                                            workspace:GetServerTimeNow() - 0.045
+                                        )
+
                                         if not res then
                                             FireDelays[item.itemType] = tick()
                                         else
@@ -3482,12 +3504,10 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                             end
                                         end
                                     end)
-                                    
+
                                     FireDelays[item.itemType] = tick() + math.max(itemMeta.fireDelaySec, FireWait.Value)
-                                    
-                                    -- Switch back to previous tool if we switched
+
                                     if switched then
-                                        -- Give enough time for the projectile to fire
                                         task.wait(0.2)
                                         switchBackToPreviousTool()
                                     end
@@ -3496,7 +3516,6 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                         end
                     end
                 end
-                
                 task.wait(0.1)
             until not ProjectileAura.Enabled
         end
@@ -3549,6 +3568,12 @@ FireWait = ProjectileAura:CreateSlider({
     Suffix = 'sec'
 })
 
+-- Add the IgnoreList
+IgnoreList = ProjectileAura:CreateTextList({
+    Name = 'Ignore Items',
+    Default = {} -- Empty by default
+})
+
 -- Add a toggle button for switching modes
 ProjectileAura:CreateToggle({
     Name = 'Mode Toggle',
@@ -3556,8 +3581,6 @@ ProjectileAura:CreateToggle({
     Tooltip = 'Toggle between normal and reverse mode',
     Function = function(enabled)
         normalMode = enabled
-        local mode = normalMode and "Normal" or "Reverse"
-        print("Mode switched to:", mode)
     end
 })	
 
