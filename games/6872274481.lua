@@ -3257,15 +3257,6 @@ local projectileRemote = {InvokeServer = function() end}
 local FireDelays = {}
 local normalMode = true -- Default mode is normal
 
--- Add background prediction variables
-local lastPrediction = {
-    target = nil,
-    position = nil,
-    timestamp = 0
-}
-
-local PREDICTION_UPDATE_RATE = 0.05 -- Update prediction every 0.05 seconds
-
 -- Store original tool information more robustly
 local previousItem = {
     tool = nil,
@@ -3276,68 +3267,157 @@ task.spawn(function()
     projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
 end)
 
--- Add background prediction function
-local function updatePrediction()
-    task.spawn(function()
-        while true do
-            if ProjectileAura.Enabled then
-                local ent = entitylib.EntityPosition({
-                    Part = 'RootPart',
-                    Range = Range.Value,
-                    Players = Targets.Players.Enabled,
-                    NPCs = Targets.NPCs.Enabled,
-                    Wallcheck = Targets.Walls.Enabled
-                })
-
-                if ent then
-                    local balloons = ent.Character:GetAttribute('InflatedBalloons')
-                    local playerGravity = workspace.Gravity
-                    
-                    if balloons and balloons > 0 then
-                        playerGravity = (workspace.Gravity * (1 - ((balloons >= 4 and 1.2 or balloons >= 3 and 1 or 0.975))))
-                    end
-                    
-                    if ent.Character.PrimaryPart:FindFirstChild('rbxassetid://8200754399') then
-                        playerGravity = 6
-                    end
-
-                    -- Store the prediction data
-                    lastPrediction = {
-                        target = ent,
-                        position = ent.RootPart.Position,
-                        velocity = ent.RootPart.Velocity,
-                        gravity = playerGravity,
-                        hipHeight = ent.HipHeight,
-                        jumping = ent.Jumping,
-                        timestamp = tick()
-                    }
-                else
-                    lastPrediction = {
-                        target = nil,
-                        position = nil,
-                        timestamp = 0
-                    }
-                end
-            end
-            task.wait(PREDICTION_UPDATE_RATE)
+local function getAmmo(check)
+    for _, item in store.inventory.inventory.items do
+        if check.ammoItemTypes and table.find(check.ammoItemTypes, item.itemType) then
+            return item.itemType
         end
-    end)
+    end
 end
 
--- [Previous utility functions remain the same: getAmmo, hasProjectileEquipped, isItemInIgnoreList, isHoldingBlock, isHoldingBreakingTool, getProjectiles, getCurrentHotbarSlot, switchHotbarItem, switchBackToPreviousTool]
+local function hasProjectileEquipped(check)
+    if not store.hand.tool then return false end
+    local itemMeta = bedwars.ItemMeta[store.hand.tool.Name]
+    return itemMeta and itemMeta.projectileSource == check
+end
+
+-- Function to check if current item is in ignore list
+local function isItemInIgnoreList()
+    if not store.hand.tool then return false end
+    return table.find(IgnoreList.ListEnabled, store.hand.tool.Name) ~= nil
+end
+
+-- Function to check if player is holding a block
+local function isHoldingBlock()
+    if not store.hand.tool then return false end
+    local itemMeta = bedwars.ItemMeta[store.hand.tool.Name]
+    return itemMeta and itemMeta.block ~= nil
+end
+
+-- Refined function to check if player is holding a breaking tool (excluding swords)
+local function isHoldingBreakingTool()
+    if not store.hand.tool then return false end
+    
+    -- First check if item is in ignore list
+    if isItemInIgnoreList() then
+        return true
+    end
+    
+    local itemMeta = bedwars.ItemMeta[store.hand.tool.Name]
+    if not itemMeta then return false end
+    if itemMeta.sword then return false end
+    if itemMeta.breakType then return true end
+    if itemMeta.pickaxe or itemMeta.axe or itemMeta.shears or itemMeta.hammer then
+        return true
+    end
+    
+    local breakingItems = {
+        "wood_pickaxe", "stone_pickaxe", "iron_pickaxe", "diamond_pickaxe",
+        "wood_axe", "stone_axe", "iron_axe", "diamond_axe",
+        "shears", "hammer"
+    }
+    
+    for _, item in ipairs(breakingItems) do
+        if store.hand.tool.Name == item then
+            return true
+        end
+    end
+    
+    for toolType, tool in pairs(store.tools or {}) do
+        if tool.itemType == store.hand.tool.Name and toolType ~= "sword" then
+            return true
+        end
+    end
+    
+    return false
+end
+
+local function getProjectiles()
+    local items = {}
+    for _, item in store.inventory.inventory.items do
+        local itemMeta = bedwars.ItemMeta[item.itemType]
+        local proj = itemMeta and itemMeta.projectileSource
+        local ammo = proj and getAmmo(proj)
+        if normalMode then
+            if ammo and table.find(List.ListEnabled, ammo) then
+                if not LimitItem.Enabled or hasProjectileEquipped(proj) then
+                    table.insert(items, {item, ammo, proj.projectileType(ammo), proj})
+                end
+            end
+        else
+            if ammo and not table.find(ReverseList.ListEnabled, ammo) then
+                if not LimitItem.Enabled or hasProjectileEquipped(proj) then
+                    table.insert(items, {item, ammo, proj.projectileType(ammo), proj})
+                end
+            end
+        end
+    end
+    return items
+end
+
+-- Store the current hotbar slot
+local function getCurrentHotbarSlot()
+    if store.hand.tool then
+        for i, v in pairs(store.inventory.hotbar) do
+            if v.item and store.hand.tool.Name == v.item.itemType then
+                return i - 1
+            end
+        end
+    end
+    return nil
+end
+
+-- Improved switchHotbarItem function that properly saves the current item
+local function switchHotbarItem(itemType)
+    if not itemType then return false end
+    
+    if store.hand.tool then
+        previousItem.tool = store.hand.tool
+        previousItem.slot = getCurrentHotbarSlot()
+    end
+    
+    for i, v in pairs(store.inventory.hotbar) do
+        if v.item and v.item.itemType == itemType then
+            if hotbarSwitch then
+                hotbarSwitch(i - 1)
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- Improved function to switch back to previous tool using the slot
+local function switchBackToPreviousTool()
+    if previousItem.slot ~= nil then
+        hotbarSwitch(previousItem.slot)
+        previousItem.tool = nil
+        previousItem.slot = nil
+        return true
+    elseif previousItem.tool then
+        store.hand:EquipTool(previousItem.tool)
+        previousItem.tool = nil
+        previousItem.slot = nil
+        return true
+    end
+    return false
+end
 
 ProjectileAura = vape.Categories.Blatant:CreateModule({
     Name = 'ProjectileAura',
     Function = function(callback)
         if callback then
-            -- Start background prediction when enabled
-            updatePrediction()
-            
             repeat
                 if (workspace:GetServerTimeNow() - bedwars.SwordController.lastAttack) > 0.5 then
-                    -- Use the last prediction if it's recent enough
-                    local ent = lastPrediction.target
-                    if ent and (tick() - lastPrediction.timestamp) < 0.1 then
+                    local ent = entitylib.EntityPosition({
+                        Part = 'RootPart',
+                        Range = Range.Value,
+                        Players = Targets.Players.Enabled,
+                        NPCs = Targets.NPCs.Enabled,
+                        Wallcheck = Targets.Walls.Enabled
+                    })
+
+                    if ent then
                         local pos = entitylib.character.RootPart.Position
                         for _, data in getProjectiles() do
                             local item, ammo, projectile, itemMeta = unpack(data)
@@ -3348,18 +3428,29 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                 local projSpeed = meta.launchVelocity
                                 local gravity = (meta.gravitationalAcceleration or 196.2)
                                 
+                                -- Enhanced prediction logic
+                                local balloons = ent.Character:GetAttribute('InflatedBalloons')
+                                local playerGravity = workspace.Gravity
+                                
+                                if balloons and balloons > 0 then
+                                    playerGravity = (workspace.Gravity * (1 - ((balloons >= 4 and 1.2 or balloons >= 3 and 1 or 0.975))))
+                                end
+                                
+                                if ent.Character.PrimaryPart:FindFirstChild('rbxassetid://8200754399') then
+                                    playerGravity = 6
+                                end
+
                                 local shootPosition = pos + (projectile == 'owl_projectile' and Vector3.zero or itemMeta.fromPositionOffset or Vector3.zero)
                                 
-                                -- Use the stored prediction data
                                 local calc = prediction.SolveTrajectory(
                                     shootPosition,
                                     projSpeed,
                                     gravity,
-                                    lastPrediction.position,
-                                    projectile == 'telepearl' and Vector3.zero or lastPrediction.velocity,
-                                    lastPrediction.gravity,
-                                    lastPrediction.hipHeight,
-                                    lastPrediction.jumping and 42.6 or nil,
+                                    ent.RootPart.Position,
+                                    projectile == 'telepearl' and Vector3.zero or ent.RootPart.Velocity,
+                                    playerGravity,
+                                    ent.HipHeight,
+                                    ent.Jumping and 42.6 or nil,
                                     rayCheck
                                 )
 
@@ -3428,7 +3519,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
             until not ProjectileAura.Enabled
         end
     end,
-    Tooltip = 'Shoots people around you with background prediction'
+    Tooltip = 'Shoots people around you with enhanced prediction'
 })
 
 Targets = ProjectileAura:CreateTargets({
