@@ -5236,6 +5236,7 @@ local Diagonal
 local LimitItem
 local Mouse
 local TowerCPS
+local label
 
 -- Pre-calculate adjacent positions
 local adjacent = table.create(26)
@@ -5250,8 +5251,6 @@ for x = -3, 3, 3 do
 end
 
 local lastpos = Vector3.zero
-local label
-local lastPlace = 0
 
 -- Optimized corner check using cached unit vectors
 local function nearCorner(poscheck, pos)
@@ -5260,6 +5259,7 @@ local function nearCorner(poscheck, pos)
     local endpos = poscheck + offset
     local dir = (pos - poscheck).Unit
     local check = poscheck + dir * 100
+    
     return Vector3.new(
         math.clamp(check.X, startpos.X, endpos.X),
         math.clamp(check.Y, startpos.Y, endpos.Y),
@@ -5283,6 +5283,7 @@ local function blockProximity(pos)
             returned = blockpos
         end
     end
+    
     table.clear(blocks)
     return returned
 end
@@ -5320,38 +5321,63 @@ Scaffold = vape.Categories.Utility:CreateModule({
         if label then
             label.Visible = callback
         end
-
+        
         if callback then
-            local towerThread
+            local towerThread = nil
+            local isJumping = false
             
-            -- Fast tower building with CPS
+            -- Utility function to handle jump animation
+            local function setJumpState(humanoid)
+                if humanoid then
+                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                end
+            end
+            
+            -- Fast tower building with proper animations
             local function startTowerBuild()
                 if towerThread then return end
+                
                 towerThread = task.spawn(function()
                     local lastBlockPos = nil
-                    while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or 
-                        (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)) do
+                    
+                    while Scaffold.Enabled and Tower.Enabled do
+                        local jumping = inputService:IsKeyDown(Enum.KeyCode.Space) or 
+                                      (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)
+                        
+                        if not jumping then
+                            break
+                        end
+                        
                         local currentTime = tick()
                         if currentTime - lastPlace >= (1 / TowerCPS.GetRandomValue()) then
                             if entitylib.isAlive then
                                 local root = entitylib.character.RootPart
-                                if root then
+                                local humanoid = entitylib.character.Humanoid
+                                
+                                if root and humanoid then
                                     local wool = getScaffoldBlock()
-                                    -- Only apply velocity if we have blocks or LimitItem is off
-                                    if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
-                                    end
                                     
-                                    -- Place blocks if we have them
                                     if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                        -- Maintain jump animation
+                                        setJumpState(humanoid)
+                                        
+                                        -- Apply velocity for tower building
+                                        if root.Velocity.Y < 45 then
+                                            root.Velocity = Vector3.new(
+                                                root.Velocity.X, 
+                                                38, 
+                                                root.Velocity.Z
+                                            )
+                                        end
+                                        
+                                        -- Block placement
                                         local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
                                         local roundedPos = roundPos(pos)
                                         
-                                        -- Only do proximity check if position changed
                                         if lastBlockPos ~= roundedPos then
                                             local block, blockpos = getPlacedBlock(roundedPos)
                                             if not block then
-                                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(pos)
+                                                blockpos = checkAdjacent(blockpos) and blockpos or blockProximity(pos)
                                                 if blockpos then
                                                     task.spawn(bedwars.placeBlock, blockpos, wool, false)
                                                     lastPlace = currentTime
@@ -5365,6 +5391,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         end
                         task.wait(0.01)
                     end
+                    
                     towerThread = nil
                 end)
             end
@@ -5376,15 +5403,22 @@ Scaffold = vape.Categories.Utility:CreateModule({
                 end
             end
             
-            -- Input handlers for tower
+            -- Input handlers
             Scaffold:Clean(inputService.InputBegan:Connect(function(input)
                 if input.KeyCode == Enum.KeyCode.Space and Tower.Enabled then
-                    startTowerBuild()
+                    if not isJumping then
+                        isJumping = true
+                        if entitylib.isAlive and entitylib.character.Humanoid then
+                            setJumpState(entitylib.character.Humanoid)
+                        end
+                        startTowerBuild()
+                    end
                 end
             end))
             
             Scaffold:Clean(inputService.InputEnded:Connect(function(input)
                 if input.KeyCode == Enum.KeyCode.Space then
+                    isJumping = false
                     stopTowerBuild()
                 end
             end))
@@ -5397,36 +5431,46 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         local jumpButton = touchGui.TouchControlFrame:WaitForChild("JumpButton", 2)
                         if jumpButton then
                             Scaffold:Clean(jumpButton.MouseButton1Down:Connect(function()
-                                if Tower.Enabled then startTowerBuild() end
+                                if Tower.Enabled then 
+                                    isJumping = true
+                                    if entitylib.isAlive and entitylib.character.Humanoid then
+                                        setJumpState(entitylib.character.Humanoid)
+                                    end
+                                    startTowerBuild() 
+                                end
                             end))
-                            Scaffold:Clean(jumpButton.MouseButton1Up:Connect(stopTowerBuild))
+                            
+                            Scaffold:Clean(jumpButton.MouseButton1Up:Connect(function()
+                                isJumping = false
+                                stopTowerBuild()
+                            end))
                         end
                     end
                 end)
             end
-
+            
             -- Main scaffold loop
             repeat
                 if entitylib.isAlive then
                     local wool, amount = getScaffoldBlock()
-
+                    
                     if Mouse.Enabled and not inputService:IsMouseButtonPressed(0) then
                         wool = nil
                     end
-
+                    
                     if label then
                         amount = amount or 0
                         label.Text = amount..' <font color="rgb(170, 170, 170)">(Scaffold)</font>'
                         label.TextColor3 = Color3.fromHSV((amount / 128) / 2.8, 0.86, 1)
                     end
-
+                    
                     if wool then
                         local root = entitylib.character.RootPart
                         local moveDir = entitylib.character.Humanoid.MoveDirection
                         local hipHeight = entitylib.character.HipHeight
                         local downOffset = Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5
                         local basePos = root.Position - Vector3.new(0, hipHeight + downOffset, 0)
-
+                        
                         for i = Expand.Value, 1, -1 do
                             local currentpos = roundPos(basePos + moveDir * (i * 3))
                             
@@ -5434,33 +5478,36 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                 local angle = math.abs(math.round(math.deg(math.atan2(-moveDir.X, -moveDir.Z)) / 45) * 45)
                                 if angle % 90 == 45 then
                                     local dt = (lastpos - currentpos)
-                                    if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and 
+                                    if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and
                                        ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
                                         currentpos = lastpos
                                     end
                                 end
                             end
-
+                            
                             local block, blockpos = getPlacedBlock(currentpos)
                             if not block then
-                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
+                                blockpos = checkAdjacent(blockpos) and blockpos or blockProximity(currentpos)
                                 if blockpos then
                                     task.spawn(bedwars.placeBlock, blockpos, wool, false)
                                 end
                             end
+                            
                             lastpos = currentpos
                         end
                     end
                 end
+                
                 task.wait(0.01)
             until not Scaffold.Enabled
         else
-            Label = nil
+            label = nil
         end
     end,
     Tooltip = 'Helps you make bridges/scaffold walk.'
 })
 
+-- Module settings
 Expand = Scaffold:CreateSlider({
     Name = 'Expand',
     Min = 1,
@@ -5482,8 +5529,13 @@ Diagonal = Scaffold:CreateToggle({
     Default = true
 })
 
-LimitItem = Scaffold:CreateToggle({Name = 'Limit to items'})
-Mouse = Scaffold:CreateToggle({Name = 'Require mouse down'})
+LimitItem = Scaffold:CreateToggle({
+    Name = 'Limit to items'
+})
+
+Mouse = Scaffold:CreateToggle({
+    Name = 'Require mouse down'
+})
 
 Count = Scaffold:CreateToggle({
     Name = 'Block Count',
