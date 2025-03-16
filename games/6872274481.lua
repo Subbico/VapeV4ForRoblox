@@ -5325,15 +5325,10 @@ Scaffold = vape.Categories.Utility:CreateModule({
         if callback then
             local towerThread = nil
             local isJumping = false
+            local lastAnimTime = 0
+            local ANIM_DELAY = 0.1
             
-            -- Utility function to handle jump animation
-            local function setJumpState(humanoid)
-                if humanoid then
-                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                end
-            end
-            
-            -- Fast tower building with proper animations
+            -- Fast tower building with optimized animation
             local function startTowerBuild()
                 if towerThread then return end
                 
@@ -5349,28 +5344,34 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         end
                         
                         local currentTime = tick()
-                        if currentTime - lastPlace >= (1 / TowerCPS.GetRandomValue()) then
-                            if entitylib.isAlive then
-                                local root = entitylib.character.RootPart
-                                local humanoid = entitylib.character.Humanoid
+                        
+                        if entitylib.isAlive then
+                            local root = entitylib.character.RootPart
+                            local humanoid = entitylib.character.Humanoid
+                            
+                            if root and humanoid then
+                                local wool = getScaffoldBlock()
                                 
-                                if root and humanoid then
-                                    local wool = getScaffoldBlock()
+                                if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
+                                    -- Handle animation separately from building logic
+                                    if currentTime - lastAnimTime >= ANIM_DELAY then
+                                        task.spawn(function()
+                                            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                                        end)
+                                        lastAnimTime = currentTime
+                                    end
                                     
-                                    if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        -- Maintain jump animation
-                                        setJumpState(humanoid)
-                                        
-                                        -- Apply velocity for tower building
-                                        if root.Velocity.Y < 45 then
-                                            root.Velocity = Vector3.new(
-                                                root.Velocity.X, 
-                                                38, 
-                                                root.Velocity.Z
-                                            )
-                                        end
-                                        
-                                        -- Block placement
+                                    -- Apply velocity for tower building
+                                    if root.Velocity.Y < 45 then
+                                        root.Velocity = Vector3.new(
+                                            root.Velocity.X, 
+                                            38, 
+                                            root.Velocity.Z
+                                        )
+                                    end
+                                    
+                                    -- Fast block placement without waiting for animation
+                                    if currentTime - lastPlace >= (1 / TowerCPS.GetRandomValue()) then
                                         local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
                                         local roundedPos = roundPos(pos)
                                         
@@ -5389,6 +5390,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                 end
                             end
                         end
+                        
                         task.wait(0.01)
                     end
                     
@@ -5409,7 +5411,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                     if not isJumping then
                         isJumping = true
                         if entitylib.isAlive and entitylib.character.Humanoid then
-                            setJumpState(entitylib.character.Humanoid)
+                            entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
                         end
                         startTowerBuild()
                     end
@@ -5434,7 +5436,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                 if Tower.Enabled then 
                                     isJumping = true
                                     if entitylib.isAlive and entitylib.character.Humanoid then
-                                        setJumpState(entitylib.character.Humanoid)
+                                        entitylib.character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
                                     end
                                     startTowerBuild() 
                                 end
