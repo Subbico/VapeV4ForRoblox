@@ -3258,7 +3258,14 @@ local projectileRemote = {InvokeServer = function() end}
 local FireDelays = {}
 local normalMode = true -- Default mode is normal
 
--- Enhanced tool state tracking
+-- Add ToolCheck support
+local function isToolCheckEnabled()
+    -- Check if ToolCheck module exists and is enabled
+    local toolCheck = vape.Modules.ToolCheck
+    return toolCheck and toolCheck.Enabled
+end
+
+-- Enhanced tool state tracking with ToolCheck support
 local toolState = {
     previous = {
         tool = nil,
@@ -3266,8 +3273,32 @@ local toolState = {
         switchTime = 0
     },
     switching = false,
-    cooldown = 0.3  -- Cooldown between switches
+    cooldown = 0.3,
+    manualSwitchOccurred = false,
+    toolCheckActive = false  -- Track if ToolCheck is preventing switches
 }
+
+-- Function to detect manual switches
+local function setupManualSwitchDetection()
+    local lastAutoSwitchTime = 0
+    
+    -- Monitor inventory changes
+    store.inventory.observeInventory(function()
+        if toolState.switching then return end  -- Ignore changes during auto-switching
+        
+        -- If the change happened significantly after our last auto-switch, consider it manual
+        if tick() - lastAutoSwitchTime > 0.2 then
+            toolState.manualSwitchOccurred = true
+        end
+    end)
+    
+    -- Update lastAutoSwitchTime when we perform an auto-switch
+    local originalSwitchHotbarItem = switchHotbarItem
+    switchHotbarItem = function(...)
+        lastAutoSwitchTime = tick()
+        return originalSwitchHotbarItem(...)
+    end
+end
 
 task.spawn(function()
     projectileRemote = bedwars.Client:Get(remotes.FireProjectile).instance
@@ -3287,20 +3318,17 @@ local function hasProjectileEquipped(check)
     return itemMeta and itemMeta.projectileSource == check
 end
 
--- Function to check if current item is in ignore list
 local function isItemInIgnoreList()
     if not store.hand.tool then return false end
     return table.find(IgnoreList.ListEnabled, store.hand.tool.Name) ~= nil
 end
 
--- Function to check if player is holding a block
 local function isHoldingBlock()
     if not store.hand.tool then return false end
     local itemMeta = bedwars.ItemMeta[store.hand.tool.Name]
     return itemMeta and itemMeta.block ~= nil
 end
 
--- Refined function to check if player is holding a breaking tool
 local function isHoldingBreakingTool()
     if not store.hand.tool then return false end
     
@@ -3338,7 +3366,6 @@ local function isHoldingBreakingTool()
     return false
 end
 
--- Improved getCurrentHotbarSlot function
 local function getCurrentHotbarSlot()
     if not store.hand.tool then return nil end
     
@@ -3350,14 +3377,29 @@ local function getCurrentHotbarSlot()
     return nil
 end
 
--- Enhanced switchHotbarItem function with proper state management
+-- Enhanced switchHotbarItem function with ToolCheck support
 local function switchHotbarItem(itemType)
     if not itemType or toolState.switching then return false end
+    
+    -- Check if ToolCheck is enabled and blocking switches
+    if isToolCheckEnabled() then
+        local toolCheck = vape.Modules.ToolCheck
+        if toolCheck and toolCheck.Enabled then
+            -- Check if we're currently in a tool-check protected state
+            if toolCheck.isProtected and toolCheck:isProtected() then
+                toolState.toolCheckActive = true
+                return false
+            end
+        end
+    end
     
     -- Don't switch if we're in cooldown
     if tick() - toolState.previous.switchTime < toolState.cooldown then
         return false
     end
+    
+    toolState.manualSwitchOccurred = false
+    toolState.toolCheckActive = false
     
     -- Save current item state before switching
     if store.hand.tool then
@@ -3383,9 +3425,32 @@ local function switchHotbarItem(itemType)
     return false
 end
 
--- Improved switchBackToPreviousTool function with state validation
+-- Improved switchBackToPreviousTool function with ToolCheck support
 local function switchBackToPreviousTool()
     if toolState.switching then return false end
+    
+    -- Don't switch back if ToolCheck is active
+    if toolState.toolCheckActive then
+        toolState.previous.tool = nil
+        toolState.previous.slot = nil
+        return false
+    end
+    
+    -- Don't switch back if player has manually switched items
+    if toolState.manualSwitchOccurred then
+        toolState.previous.tool = nil
+        toolState.previous.slot = nil
+        return false
+    end
+    
+    -- Check ToolCheck state before switching back
+    if isToolCheckEnabled() then
+        local toolCheck = vape.Modules.ToolCheck
+        if toolCheck and toolCheck.Enabled and toolCheck.isProtected and toolCheck:isProtected() then
+            toolState.toolCheckActive = true
+            return false
+        end
+    end
     
     if toolState.previous.slot ~= nil then
         toolState.switching = true
@@ -3412,6 +3477,25 @@ local function switchBackToPreviousTool()
     return false
 end
 
+-- Update the projectile handling with ToolCheck support
+local function handleProjectileSwitch(item, itemMeta)
+    local switched = false
+    
+    if AutoSwitch.Enabled and not hasProjectileEquipped(itemMeta) then
+        if not isHoldingBlock() and not isHoldingBreakingTool() then
+            -- Check ToolCheck state before attempting switch
+            if not isToolCheckEnabled() or not vape.Modules.ToolCheck:isProtected() then
+                switched = switchHotbarItem(item.itemType)
+                if switched then
+                    task.wait(0.15)
+                end
+            end
+        end
+    end
+    
+    return switched
+end
+
 local function getProjectiles()
     local items = {}
     for _, item in store.inventory.inventory.items do
@@ -3435,6 +3519,11 @@ local function getProjectiles()
     end
     return items
 end
+
+-- Initialize the manual switch detection
+task.spawn(function()
+    setupManualSwitchDetection()
+end)
 
 ProjectileAura = vape.Categories.Blatant:CreateModule({
     Name = 'ProjectileAura',
@@ -3460,7 +3549,6 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                 local projSpeed = meta.launchVelocity
                                 local gravity = (meta.gravitationalAcceleration or 196.2)
                                 
-                                -- Enhanced prediction logic
                                 local balloons = ent.Character:GetAttribute('InflatedBalloons')
                                 local playerGravity = workspace.Gravity
                                 
@@ -3488,16 +3576,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                 
                                 if calc then
                                     targetinfo.Targets[ent] = tick() + 1
-                                    local switched = false
-                                    
-                                    if AutoSwitch.Enabled and not hasProjectileEquipped(itemMeta) then
-                                        if not isHoldingBlock() and not isHoldingBreakingTool() then
-                                            switched = switchHotbarItem(item.itemType)
-                                            if switched then
-                                                task.wait(0.15)
-                                            end
-                                        end
-                                    end
+                                    local switched = handleProjectileSwitch(item, itemMeta)
                                     
                                     task.spawn(function()
                                         local dir = CFrame.lookAt(shootPosition, calc).LookVector
@@ -3538,7 +3617,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                     
                                     FireDelays[item.itemType] = tick() + math.max(itemMeta.fireDelaySec, FireWait.Value)
                                     
-                                    if switched then
+                                    if switched and not toolState.toolCheckActive then
                                         task.wait(0.2)
                                         local switchBack = switchBackToPreviousTool()
                                         if switchBack then
