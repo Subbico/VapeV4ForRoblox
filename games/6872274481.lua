@@ -3258,10 +3258,15 @@ local projectileRemote = {InvokeServer = function() end}
 local FireDelays = {}
 local normalMode = true -- Default mode is normal
 
--- Store original tool information more robustly
-local previousItem = {
-    tool = nil,
-    slot = nil
+-- Enhanced tool state tracking
+local toolState = {
+    previous = {
+        tool = nil,
+        slot = nil,
+        switchTime = 0
+    },
+    switching = false,
+    cooldown = 0.3  -- Cooldown between switches
 }
 
 task.spawn(function()
@@ -3295,11 +3300,10 @@ local function isHoldingBlock()
     return itemMeta and itemMeta.block ~= nil
 end
 
--- Refined function to check if player is holding a breaking tool (excluding swords)
+-- Refined function to check if player is holding a breaking tool
 local function isHoldingBreakingTool()
     if not store.hand.tool then return false end
     
-    -- First check if item is in ignore list
     if isItemInIgnoreList() then
         return true
     end
@@ -3308,6 +3312,7 @@ local function isHoldingBreakingTool()
     if not itemMeta then return false end
     if itemMeta.sword then return false end
     if itemMeta.breakType then return true end
+    
     if itemMeta.pickaxe or itemMeta.axe or itemMeta.shears or itemMeta.hammer then
         return true
     end
@@ -3333,12 +3338,87 @@ local function isHoldingBreakingTool()
     return false
 end
 
+-- Improved getCurrentHotbarSlot function
+local function getCurrentHotbarSlot()
+    if not store.hand.tool then return nil end
+    
+    for i, v in pairs(store.inventory.hotbar) do
+        if v.item and store.hand.tool.Name == v.item.itemType then
+            return i - 1
+        end
+    end
+    return nil
+end
+
+-- Enhanced switchHotbarItem function with proper state management
+local function switchHotbarItem(itemType)
+    if not itemType or toolState.switching then return false end
+    
+    -- Don't switch if we're in cooldown
+    if tick() - toolState.previous.switchTime < toolState.cooldown then
+        return false
+    end
+    
+    -- Save current item state before switching
+    if store.hand.tool then
+        toolState.previous.tool = store.hand.tool
+        toolState.previous.slot = getCurrentHotbarSlot()
+        toolState.previous.switchTime = tick()
+    end
+    
+    -- Find and switch to the target item
+    for i, v in pairs(store.inventory.hotbar) do
+        if v.item and v.item.itemType == itemType then
+            toolState.switching = true
+            if hotbarSwitch then
+                hotbarSwitch(i - 1)
+                task.delay(0.1, function()
+                    toolState.switching = false
+                end)
+                return true
+            end
+        end
+    end
+    
+    return false
+end
+
+-- Improved switchBackToPreviousTool function with state validation
+local function switchBackToPreviousTool()
+    if toolState.switching then return false end
+    
+    if toolState.previous.slot ~= nil then
+        toolState.switching = true
+        hotbarSwitch(toolState.previous.slot)
+        
+        task.delay(0.1, function()
+            toolState.previous.tool = nil
+            toolState.previous.slot = nil
+            toolState.switching = false
+        end)
+        return true
+    elseif toolState.previous.tool then
+        toolState.switching = true
+        store.hand:EquipTool(toolState.previous.tool)
+        
+        task.delay(0.1, function()
+            toolState.previous.tool = nil
+            toolState.previous.slot = nil
+            toolState.switching = false
+        end)
+        return true
+    end
+    
+    return false
+end
+
 local function getProjectiles()
     local items = {}
     for _, item in store.inventory.inventory.items do
         local itemMeta = bedwars.ItemMeta[item.itemType]
         local proj = itemMeta and itemMeta.projectileSource
         local ammo = proj and getAmmo(proj)
+        
         if normalMode then
             if ammo and table.find(List.ListEnabled, ammo) then
                 if not LimitItem.Enabled or hasProjectileEquipped(proj) then
@@ -3356,54 +3436,6 @@ local function getProjectiles()
     return items
 end
 
--- Store the current hotbar slot
-local function getCurrentHotbarSlot()
-    if store.hand.tool then
-        for i, v in pairs(store.inventory.hotbar) do
-            if v.item and store.hand.tool.Name == v.item.itemType then
-                return i - 1
-            end
-        end
-    end
-    return nil
-end
-
--- Improved switchHotbarItem function that properly saves the current item
-local function switchHotbarItem(itemType)
-    if not itemType then return false end
-    
-    if store.hand.tool then
-        previousItem.tool = store.hand.tool
-        previousItem.slot = getCurrentHotbarSlot()
-    end
-    
-    for i, v in pairs(store.inventory.hotbar) do
-        if v.item and v.item.itemType == itemType then
-            if hotbarSwitch then
-                hotbarSwitch(i - 1)
-                return true
-            end
-        end
-    end
-    return false
-end
-
--- Improved function to switch back to previous tool using the slot
-local function switchBackToPreviousTool()
-    if previousItem.slot ~= nil then
-        hotbarSwitch(previousItem.slot)
-        previousItem.tool = nil
-        previousItem.slot = nil
-        return true
-    elseif previousItem.tool then
-        store.hand:EquipTool(previousItem.tool)
-        previousItem.tool = nil
-        previousItem.slot = nil
-        return true
-    end
-    return false
-end
-
 ProjectileAura = vape.Categories.Blatant:CreateModule({
     Name = 'ProjectileAura',
     Function = function(callback)
@@ -3417,12 +3449,11 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                         NPCs = Targets.NPCs.Enabled,
                         Wallcheck = Targets.Walls.Enabled
                     })
-
+                    
                     if ent then
                         local pos = entitylib.character.RootPart.Position
                         for _, data in getProjectiles() do
                             local item, ammo, projectile, itemMeta = unpack(data)
-                            
                             if (FireDelays[item.itemType] or 0) < tick() then
                                 rayCheck.FilterDescendantsInstances = {workspace.Map}
                                 local meta = bedwars.ProjectileMeta[projectile]
@@ -3440,7 +3471,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                 if ent.Character.PrimaryPart:FindFirstChild('rbxassetid://8200754399') then
                                     playerGravity = 6
                                 end
-
+                                
                                 local shootPosition = pos + (projectile == 'owl_projectile' and Vector3.zero or itemMeta.fromPositionOffset or Vector3.zero)
                                 
                                 local calc = prediction.SolveTrajectory(
@@ -3454,20 +3485,20 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                     ent.Jumping and 42.6 or nil,
                                     rayCheck
                                 )
-
+                                
                                 if calc then
                                     targetinfo.Targets[ent] = tick() + 1
                                     local switched = false
-
+                                    
                                     if AutoSwitch.Enabled and not hasProjectileEquipped(itemMeta) then
                                         if not isHoldingBlock() and not isHoldingBreakingTool() then
                                             switched = switchHotbarItem(item.itemType)
                                             if switched then
-                                                task.wait(0.1)
+                                                task.wait(0.15)
                                             end
                                         end
                                     end
-
+                                    
                                     task.spawn(function()
                                         local dir = CFrame.lookAt(shootPosition, calc).LookVector
                                         local id = httpService:GenerateGUID(true)
@@ -3481,7 +3512,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                             dir * projSpeed,
                                             {drawDurationSeconds = 1}
                                         )
-
+                                        
                                         local res = projectileRemote:InvokeServer(
                                             item.tool,
                                             ammo,
@@ -3493,7 +3524,7 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                             {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)},
                                             workspace:GetServerTimeNow() - 0.045
                                         )
-
+                                        
                                         if not res then
                                             FireDelays[item.itemType] = tick()
                                         else
@@ -3504,12 +3535,15 @@ ProjectileAura = vape.Categories.Blatant:CreateModule({
                                             end
                                         end
                                     end)
-
+                                    
                                     FireDelays[item.itemType] = tick() + math.max(itemMeta.fireDelaySec, FireWait.Value)
-
+                                    
                                     if switched then
                                         task.wait(0.2)
-                                        switchBackToPreviousTool()
+                                        local switchBack = switchBackToPreviousTool()
+                                        if switchBack then
+                                            task.wait(0.1)
+                                        end
                                     end
                                 end
                             end
