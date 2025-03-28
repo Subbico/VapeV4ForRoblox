@@ -1031,7 +1031,7 @@ local function saveErrorLog(err, S_Name)
 		Data = errorLog
 	})
 	writefile('VW_Error_Log.json', HttpService:JSONEncode(main))
-	errorNotification("Voidware -  Error Logger", 'If you can please send the\n VW_Error_Log.json file in your workspace to erchodev#0 or discord.gg/voidware', 10)
+	errorNotification("Subbico -  Error Logger", 'If you can please send the\n VW_Error_Log.json file in your workspace to erchodev#0 or discord.gg/Subbico', 10)
 	warn('---------------[ERROR LOG START]--------------')
 	warn(HttpService:JSONEncode(errorLog))
 	warn('---------------[ERROR LOG END]--------------')
@@ -1791,9 +1791,9 @@ function KaidaController:request(target)
 end
 
 if not bedwars.Client then
-	errorNotification('Voidware Bedwars', "There was a critical loading error! \n Please report this issue to erchodev#0 or discord.gg/voidware", 10)
+	errorNotification('Subbico Bedwars', "There was a critical loading error! \n Please report this issue to erchodev#0 or discord.gg/Subbico", 10)
 end
-assert(bedwars.Client ~= nil and type(bedwars.Client) == "table", "There was a critical loading error! \n Please report this issue to erchodev#0 or discord.gg/voidware")
+assert(bedwars.Client ~= nil and type(bedwars.Client) == "table", "There was a critical loading error! \n Please report this issue to erchodev#0 or discord.gg/Subbico")
 
 for _, v in {'AntiRagdoll', 'TriggerBot', 'SilentAim', 'AutoRejoin', 'Rejoin', 'Disabler', 'Timer', 'ServerHop', 'MouseTP', 'MurderMystery'} do
 	vape:Remove(v)
@@ -3618,7 +3618,7 @@ local RunLoops = {
 
 local function BindToLoop(tableName, service, name, func)
 	local oldfunc = func
-	func = function(delta) VoidwareFunctions.handlepcall(pcall(function() oldfunc(delta) end)) end
+	func = function(delta) SubbicoFunctions.handlepcall(pcall(function() oldfunc(delta) end)) end
     if RunLoops[tableName][name] == nil then
         RunLoops[tableName][name] = service:Connect(func)
         table.insert(vapeConnections, RunLoops[tableName][name])
@@ -9651,13 +9651,13 @@ run(function()
 	})
 end)
 	
-VoidwareFunctions.GlobaliseObject("store", store)
-VoidwareFunctions.GlobaliseObject("GlobalStore", store)
+SubbicoFunctions.GlobaliseObject("store", store)
+SubbicoFunctions.GlobaliseObject("GlobalStore", store)
 
-VoidwareFunctions.GlobaliseObject("bedwars", bedwars)
-VoidwareFunctions.GlobaliseObject("GlobalBedwars", bedwars)
+SubbicoFunctions.GlobaliseObject("bedwars", bedwars)
+SubbicoFunctions.GlobaliseObject("GlobalBedwars", bedwars)
 
-VoidwareFunctions.GlobaliseObject("VapeBWLoaded", true)
+SubbicoFunctions.GlobaliseObject("VapeBWLoaded", true)
 local function createMonitoredTable(originalTable, onChange)
     local proxy = {}
     local mt = {
@@ -9674,12 +9674,12 @@ local function createMonitoredTable(originalTable, onChange)
     return proxy
 end
 local function onChange(key, oldValue, newValue)
-   	VoidwareFunctions.GlobaliseObject("store", store)
-	VoidwareFunctions.GlobaliseObject("GlobalStore", store)
+   	SubbicoFunctions.GlobaliseObject("store", store)
+	SubbicoFunctions.GlobaliseObject("GlobalStore", store)
 end
 local function onChange2(key, oldValue, newValue)
-	VoidwareFunctions.GlobaliseObject("bedwars", bedwars)
-	VoidwareFunctions.GlobaliseObject("GlobalBedwars", bedwars)
+	SubbicoFunctions.GlobaliseObject("bedwars", bedwars)
+	SubbicoFunctions.GlobaliseObject("GlobalBedwars", bedwars)
 end
 
 store = createMonitoredTable(store, onChange)
