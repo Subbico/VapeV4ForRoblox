@@ -9652,7 +9652,6 @@ run(function()
 end)
 	
 SubbicoFunctions.GlobaliseObject("store", store)
-SubbicoFunctions.GlobaliseObject("GlobalStore", store)
 
 SubbicoFunctions.GlobaliseObject("bedwars", bedwars)
 SubbicoFunctions.GlobaliseObject("GlobalBedwars", bedwars)
