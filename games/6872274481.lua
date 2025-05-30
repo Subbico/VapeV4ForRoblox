@@ -2989,8 +2989,7 @@ run(function()
 	})
 end)
 	
-run(function()
-local ProjectileAura
+ local ProjectileAura
 local Targets
 local Range
 local List
