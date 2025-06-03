@@ -5186,7 +5186,7 @@ local function blockProximity(pos)
     local startPos = bedwars.BlockController:getBlockPosition(pos - Vector3.new(15, 15, 15))
     local endPos = bedwars.BlockController:getBlockPosition(pos + Vector3.new(15, 15, 15))
     local blocks = getBlocksInPoints(startPos, endPos)
-    
+
     for i = 1, #blocks do
         local blockpos = nearCorner(blocks[i], pos)
         local newmag = (pos - blockpos).Magnitude
@@ -5235,13 +5235,13 @@ Scaffold = vape.Categories.Utility:CreateModule({
 
         if callback then
             local towerThread
-            
+
             -- Fast tower building with CPS
             local function startTowerBuild()
                 if towerThread then return end
                 towerThread = task.spawn(function()
                     local lastBlockPos = nil
-                    while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or 
+                    while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or
                         (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)) do
                         local currentTime = tick()
                         if currentTime - lastPlace >= (1 / TowerCPS.GetRandomValue()) then
@@ -5251,14 +5251,14 @@ Scaffold = vape.Categories.Utility:CreateModule({
                                     local wool = getScaffoldBlock()
                                     -- Only apply velocity if we have blocks or LimitItem is off
                                     if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                                        -- Removed: root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
                                     end
-                                    
+
                                     -- Place blocks if we have them
                                     if wool and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
                                         local pos = root.Position - Vector3.new(0, entitylib.character.HipHeight + 1.5, 0)
                                         local roundedPos = roundPos(pos)
-                                        
+
                                         -- Only do proximity check if position changed
                                         if lastBlockPos ~= roundedPos then
                                             local block, blockpos = getPlacedBlock(roundedPos)
@@ -5280,27 +5280,27 @@ Scaffold = vape.Categories.Utility:CreateModule({
                     towerThread = nil
                 end)
             end
-            
+
             local function stopTowerBuild()
                 if towerThread then
                     task.cancel(towerThread)
                     towerThread = nil
                 end
             end
-            
+
             -- Input handlers for tower
             Scaffold:Clean(inputService.InputBegan:Connect(function(input)
                 if input.KeyCode == Enum.KeyCode.Space and Tower.Enabled then
                     startTowerBuild()
                 end
             end))
-            
+
             Scaffold:Clean(inputService.InputEnded:Connect(function(input)
                 if input.KeyCode == Enum.KeyCode.Space then
                     stopTowerBuild()
                 end
             end))
-            
+
             -- Mobile support
             if inputService.TouchEnabled then
                 pcall(function()
@@ -5341,12 +5341,12 @@ Scaffold = vape.Categories.Utility:CreateModule({
 
                         for i = Expand.Value, 1, -1 do
                             local currentpos = roundPos(basePos + moveDir * (i * 3))
-                            
+
                             if Diagonal.Enabled then
                                 local angle = math.abs(math.round(math.deg(math.atan2(-moveDir.X, -moveDir.Z)) / 45) * 45)
                                 if angle % 90 == 45 then
                                     local dt = (lastpos - currentpos)
-                                    if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and 
+                                    if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and
                                        ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
                                         currentpos = lastpos
                                     end
@@ -5428,6 +5428,7 @@ TowerCPS = Scaffold:CreateTwoSlider({
     DefaultMax = 20,
     Darker = true
 })
+
 	
 run(function()
 	local ShopTierBypass
