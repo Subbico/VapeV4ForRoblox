@@ -5244,14 +5244,14 @@ Scaffold = vape.Categories.Utility:CreateModule({
                     while Scaffold.Enabled and Tower.Enabled and (inputService:IsKeyDown(Enum.KeyCode.Space) or 
                         (inputService.TouchEnabled and lplr.PlayerGui.TouchGui.TouchControlFrame.JumpButton.ImageTransparency < 1)) do
                         local currentTime = tick()
-                        if currentTime - lastPlace >= (15 / TowerCPS.GetRandomValue()) then
+                        if currentTime - lastPlace >= (3 / TowerCPS.GetRandomValue()) then
                             if entitylib.isAlive then
                                 local root = entitylib.character.RootPart
                                 if root then
                                     local wool = getScaffoldBlock()
                                     -- Only apply velocity if we have blocks or LimitItem is off
                                     if (wool or not LimitItem.Enabled) and not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
-                                        root.Velocity = Vector3.new(root.Velocity.X, 50, root.Velocity.Z)
+                                        root.Velocity = Vector3.new(root.Velocity.X, 47, root.Velocity.Z)
                                     end
                                     
                                     -- Place blocks if we have them
