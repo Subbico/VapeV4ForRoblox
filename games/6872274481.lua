@@ -4805,6 +4805,10 @@ end)
 
 run(function()
 
+-- Ultra-Fast Scaffold Module for Roblox Bedwars
+
+run(function()
+
 local Scaffold
 local Expand
 local Tower
@@ -4906,36 +4910,35 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
                             root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
                         end
-                        -- Place up to 3 blocks per tick for speed
-                        for tickBlocks = 1, 3 do
-                            for i = Expand.Value, 1, -1 do
-                                local currentpos = roundPos(
-                                    root.Position
-                                    - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0)
-                                    + entitylib.character.Humanoid.MoveDirection * (i * 3)
-                                )
-                                -- Diagonal logic
-                                if Diagonal.Enabled then
-                                    if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
-                                        local dt = (lastpos - currentpos)
-                                        if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
-                                            currentpos = lastpos
-                                        end
+                        -- Place as many blocks as possible per tick (ultra fast)
+                        for i = Expand.Value, 1, -1 do
+                            local currentpos = roundPos(
+                                root.Position
+                                - Vector3.new(0, entitylib.character.HipHeight + (Downwards.Enabled and inputService:IsKeyDown(Enum.KeyCode.LeftShift) and 4.5 or 1.5), 0)
+                                + entitylib.character.Humanoid.MoveDirection * (i * 3)
+                            )
+                            -- Diagonal logic
+                            if Diagonal.Enabled then
+                                if math.abs(math.round(math.deg(math.atan2(-entitylib.character.Humanoid.MoveDirection.X, -entitylib.character.Humanoid.MoveDirection.Z)) / 45) * 45) % 90 == 45 then
+                                    local dt = (lastpos - currentpos)
+                                    if ((dt.X == 0 and dt.Z ~= 0) or (dt.X ~= 0 and dt.Z == 0)) and ((lastpos - root.Position) * Vector3.new(1, 0, 1)).Magnitude < 2.5 then
+                                        currentpos = lastpos
                                     end
                                 end
-                                local block, blockpos = getPlacedBlock(currentpos)
-                                if not block then
-                                    blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
-                                    if blockpos then
-                                        task.spawn(bedwars.placeBlock, blockpos, wool, false)
-                                    end
-                                end
-                                lastpos = currentpos
                             end
+                            local block, blockpos = getPlacedBlock(currentpos)
+                            if not block then
+                                blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
+                                if blockpos then
+                                    -- Place block in parallel for speed
+                                    task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                end
+                            end
+                            lastpos = currentpos
                         end
                     end
                 end
-                task.wait(0.01) -- Reduced wait for faster placement
+                task.wait(0) -- Fastest possible wait
             until not Scaffold.Enabled
         else
             if label then
@@ -4943,7 +4946,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
             end
         end
     end,
-    Tooltip = 'Helps you make bridges/scaffold walk (now much faster!).'
+    Tooltip = 'Helps you make bridges/scaffold walk (ultra fast!).'
 })
 
 Expand = Scaffold:CreateSlider({
@@ -4996,217 +4999,6 @@ Count = Scaffold:CreateToggle({
     end
 })
 
-end)
-	
-run(function()
-	local ShopTierBypass
-	local tiered, nexttier = {}, {}
-	
-	ShopTierBypass = vape.Categories.Utility:CreateModule({
-		Name = 'ShopTierBypass',
-		Function = function(callback)
-			if callback then
-				repeat task.wait() until store.shopLoaded or not ShopTierBypass.Enabled
-				if ShopTierBypass.Enabled then
-					for _, v in bedwars.Shop.ShopItems do
-						tiered[v] = v.tiered
-						nexttier[v] = v.nextTier
-						v.nextTier = nil
-						v.tiered = nil
-					end
-				end
-			else
-				for i, v in tiered do
-					i.tiered = v
-				end
-				for i, v in nexttier do
-					i.nextTier = v
-				end
-				table.clear(nexttier)
-				table.clear(tiered)
-			end
-		end,
-		Tooltip = 'Lets you buy things like armor early.'
-	})
-end)
-	
-run(function()
-	local StaffDetector
-	local Mode
-	local Clans
-	local Party
-	local Profile
-	local Users
-	local blacklistedclans = {'gg', 'gg2', 'DV', 'DV2'}
-	local blacklisteduserids = {1502104539, 3826146717, 4531785383, 1049767300, 4926350670, 653085195, 184655415, 2752307430, 5087196317, 5744061325, 1536265275}
-	local joined = {}
-	
-	local function getRole(plr, id)
-		local suc, res = pcall(function()
-			return plr:GetRankInGroup(id)
-		end)
-		if not suc then
-			notif('StaffDetector', res, 30, 'alert')
-		end
-		return suc and res or 0
-	end
-	
-	local function staffFunction(plr, checktype)
-		if not vape.Loaded then
-			repeat task.wait() until vape.Loaded
-		end
-	
-		notif('StaffDetector', 'Staff Detected ('..checktype..'): '..plr.Name..' ('..plr.UserId..')', 60, 'alert')
-		whitelist.customtags[plr.Name] = {{text = 'GAME STAFF', color = Color3.new(1, 0, 0)}}
-	
-		if Party.Enabled and not checktype:find('clan') then
-			bedwars.PartyController:leaveParty()
-		end
-	
-		if Mode.Value == 'Uninject' then
-			task.spawn(function()
-				vape:Uninject()
-			end)
-			game:GetService('StarterGui'):SetCore('SendNotification', {
-				Title = 'StaffDetector',
-				Text = 'Staff Detected ('..checktype..')\n'..plr.Name..' ('..plr.UserId..')',
-				Duration = 60,
-			})
-		elseif Mode.Value == 'Requeue' then
-			bedwars.QueueController:joinQueue(store.queueType)
-		elseif Mode.Value == 'Profile' then
-			vape.Save = function() end
-			if vape.Profile ~= Profile.Value then
-				vape:Load(true, Profile.Value)
-			end
-		elseif Mode.Value == 'AutoConfig' then
-			local safe = {'AutoClicker', 'Reach', 'Sprint', 'HitFix', 'StaffDetector'}
-			vape.Save = function() end
-			for i, v in vape.Modules do
-				if not (table.find(safe, i) or v.Category == 'Render') then
-					if v.Enabled then
-						v:Toggle()
-					end
-					v:SetBind('')
-				end
-			end
-		end
-	end
-	
-	local function checkFriends(list)
-		for _, v in list do
-			if joined[v] then
-				return joined[v]
-			end
-		end
-		return nil
-	end
-	
-	local function checkJoin(plr, connection)
-		if not plr:GetAttribute('Team') and plr:GetAttribute('Spectator') and not bedwars.Store:getState().Game.customMatch then
-			connection:Disconnect()
-			local tab, pages = {}, playersService:GetFriendsAsync(plr.UserId)
-			for _ = 1, 4 do
-				for _, v in pages:GetCurrentPage() do
-					table.insert(tab, v.Id)
-				end
-				if pages.IsFinished then break end
-				pages:AdvanceToNextPageAsync()
-			end
-	
-			local friend = checkFriends(tab)
-			if not friend then
-				staffFunction(plr, 'impossible_join')
-				return true
-			else
-				notif('StaffDetector', string.format('Spectator %s joined from %s', plr.Name, friend), 20, 'warning')
-			end
-		end
-	end
-	
-	local function playerAdded(plr)
-		joined[plr.UserId] = plr.Name
-		if plr == lplr then return end
-	
-		if table.find(blacklisteduserids, plr.UserId) or table.find(Users.ListEnabled, tostring(plr.UserId)) then
-			staffFunction(plr, 'blacklisted_user')
-		elseif getRole(plr, 5774246) >= 100 then
-			staffFunction(plr, 'staff_role')
-		else
-			local connection
-			connection = plr:GetAttributeChangedSignal('Spectator'):Connect(function()
-				checkJoin(plr, connection)
-			end)
-			StaffDetector:Clean(connection)
-			if checkJoin(plr, connection) then
-				return
-			end
-	
-			if not plr:GetAttribute('ClanTag') then
-				plr:GetAttributeChangedSignal('ClanTag'):Wait()
-			end
-	
-			if table.find(blacklistedclans, plr:GetAttribute('ClanTag')) and vape.Loaded and Clans.Enabled then
-				connection:Disconnect()
-				staffFunction(plr, 'blacklisted_clan_'..plr:GetAttribute('ClanTag'):lower())
-			end
-		end
-	end
-	
-	StaffDetector = vape.Categories.Utility:CreateModule({
-		Name = 'StaffDetector',
-		Function = function(callback)
-			if callback then
-				StaffDetector:Clean(playersService.PlayerAdded:Connect(playerAdded))
-				for _, v in playersService:GetPlayers() do
-					task.spawn(playerAdded, v)
-				end
-			else
-				table.clear(joined)
-			end
-		end,
-		Tooltip = 'Detects people with a staff rank ingame'
-	})
-	Mode = StaffDetector:CreateDropdown({
-		Name = 'Mode',
-		List = {'Uninject', 'Profile', 'Requeue', 'AutoConfig', 'Notify'},
-		Function = function(val)
-			if Profile.Object then
-				Profile.Object.Visible = val == 'Profile'
-			end
-		end
-	})
-	Clans = StaffDetector:CreateToggle({
-		Name = 'Blacklist clans',
-		Default = true
-	})
-	Party = StaffDetector:CreateToggle({
-		Name = 'Leave party'
-	})
-	Profile = StaffDetector:CreateTextBox({
-		Name = 'Profile',
-		Default = 'default',
-		Darker = true,
-		Visible = false
-	})
-	Users = StaffDetector:CreateTextList({
-		Name = 'Users',
-		Placeholder = 'player (userid)'
-	})
-	
-	task.spawn(function()
-		repeat task.wait(1) until vape.Loaded or vape.Loaded == nil
-		if vape.Loaded and not StaffDetector.Enabled then
-			StaffDetector:Toggle()
-		end
-	end)
-end)
-	
-run(function()
-	TrapDisabler = vape.Categories.Utility:CreateModule({
-		Name = 'TrapDisabler',
-		Tooltip = 'Disables Snap Traps'
-	})
 end)
 	
 run(function()
