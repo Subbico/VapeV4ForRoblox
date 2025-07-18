@@ -4913,7 +4913,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         -- Ultra-fast Tower logic
                         if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
                             -- Set a very high Y velocity for instant upward movement
-                            root.Velocity = Vector3.new(root.Velocity.X, 100, root.Velocity.Z)
+                            root.Velocity = Vector3.new(root.Velocity.X, 50, root.Velocity.Z)
                             -- Place multiple blocks below the player in one frame (for safety)
                             for yOffset = 1.5, 6, 1.5 do
                                 local towerPos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + yOffset, 0))
