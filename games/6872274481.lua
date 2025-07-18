@@ -4803,7 +4803,6 @@ end)
 -- Ultra-Fast Scaffold Module for Roblox Bedwars
 
 run(function()
-
 local Scaffold
 local Expand
 local Tower
@@ -5002,7 +5001,6 @@ Count = Scaffold:CreateToggle({
     end
 })
 
-end)
 end)
 	
 run(function()
