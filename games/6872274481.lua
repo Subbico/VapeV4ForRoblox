@@ -4802,7 +4802,10 @@ end)
 	
 -- Ultra-Fast Scaffold Module for Roblox Bedwars
 
+-- Ultra-Fast Scaffold Module for Roblox Bedwars with Aggressive Tower Logic
+
 run(function()
+
 local Scaffold
 local Expand
 local Tower
@@ -4888,7 +4891,6 @@ Scaffold = vape.Categories.Utility:CreateModule({
             label.Visible = callback
         end
         if callback then
-            -- Remove all waits: run as fast as possible using Heartbeat
             local running = true
             local conn
             conn = game:GetService("RunService").Heartbeat:Connect(function()
@@ -4908,10 +4910,23 @@ Scaffold = vape.Categories.Utility:CreateModule({
                     end
                     if wool then
                         local root = entitylib.character.RootPart
+                        -- Ultra-fast Tower logic
                         if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
-                            root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
+                            -- Set a very high Y velocity for instant upward movement
+                            root.Velocity = Vector3.new(root.Velocity.X, 100, root.Velocity.Z)
+                            -- Place multiple blocks below the player in one frame (for safety)
+                            for yOffset = 1.5, 6, 1.5 do
+                                local towerPos = roundPos(root.Position - Vector3.new(0, entitylib.character.HipHeight + yOffset, 0))
+                                local block, blockpos = getPlacedBlock(towerPos)
+                                if not block then
+                                    blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(towerPos)
+                                    if blockpos then
+                                        task.spawn(bedwars.placeBlock, blockpos, wool, false)
+                                    end
+                                end
+                            end
                         end
-                        -- Place blocks at all expand positions in parallel
+                        -- Scaffold block placement (optimized)
                         for i = Expand.Value, 1, -1 do
                             local currentpos = roundPos(
                                 root.Position
@@ -4947,7 +4962,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
             end
         end
     end,
-    Tooltip = 'Helps you make bridges/scaffold walk (ultra fast, no waits, parallel placements).'
+    Tooltip = 'Helps you make bridges/scaffold walk (ultra fast, aggressive tower logic).'
 })
 
 Expand = Scaffold:CreateSlider({
