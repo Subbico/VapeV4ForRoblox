@@ -4800,7 +4800,10 @@ run(function()
 	})
 end)
 	
+-- Ultra-Fast Scaffold Module for Roblox Bedwars
+
 run(function()
+
 local Scaffold
 local Expand
 local Tower
@@ -4886,7 +4889,14 @@ Scaffold = vape.Categories.Utility:CreateModule({
             label.Visible = callback
         end
         if callback then
-            repeat
+            -- Remove all waits: run as fast as possible using Heartbeat
+            local running = true
+            local conn
+            conn = game:GetService("RunService").Heartbeat:Connect(function()
+                if not Scaffold.Enabled or not running then
+                    if conn then conn:Disconnect() end
+                    return
+                end
                 if entitylib.isAlive then
                     local wool, amount = getScaffoldBlock()
                     if Mouse.Enabled and not inputService:IsMouseButtonPressed(0) then
@@ -4902,7 +4912,7 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         if Tower.Enabled and inputService:IsKeyDown(Enum.KeyCode.Space) and (not inputService:GetFocusedTextBox()) then
                             root.Velocity = Vector3.new(root.Velocity.X, 38, root.Velocity.Z)
                         end
-                        -- Place as many blocks as possible per tick (ultra fast)
+                        -- Place blocks at all expand positions in parallel
                         for i = Expand.Value, 1, -1 do
                             local currentpos = roundPos(
                                 root.Position
@@ -4922,7 +4932,6 @@ Scaffold = vape.Categories.Utility:CreateModule({
                             if not block then
                                 blockpos = checkAdjacent(blockpos * 3) and blockpos * 3 or blockProximity(currentpos)
                                 if blockpos then
-                                    -- Place block in parallel for speed
                                     task.spawn(bedwars.placeBlock, blockpos, wool, false)
                                 end
                             end
@@ -4930,21 +4939,23 @@ Scaffold = vape.Categories.Utility:CreateModule({
                         end
                     end
                 end
-                task.wait(0) -- Fastest possible wait
-            until not Scaffold.Enabled
+            end)
+            repeat task.wait(0.1) until not Scaffold.Enabled
+            running = false
         else
             if label then
                 label.Visible = false
             end
         end
     end,
-    Tooltip = 'Helps you make bridges/scaffold walk (ultra fast!).'
+    Tooltip = 'Helps you make bridges/scaffold walk (ultra fast, no waits, parallel placements).'
 })
 
 Expand = Scaffold:CreateSlider({
     Name = 'Expand',
     Min = 1,
-    Max = 6
+    Max = 6,
+    Default = 6 -- Maximize by default for speed
 })
 
 Tower = Scaffold:CreateToggle({
@@ -4991,6 +5002,7 @@ Count = Scaffold:CreateToggle({
     end
 })
 
+end)
 end)
 	
 run(function()
