@@ -4800,15 +4800,7 @@ run(function()
 	})
 end)
 	
--- Fast Scaffold Module for Roblox Bedwars
--- Optimized for rapid block placement
-
 run(function()
-
--- Ultra-Fast Scaffold Module for Roblox Bedwars
-
-run(function()
-
 local Scaffold
 local Expand
 local Tower
