@@ -36,6 +36,7 @@ If its not the supposed utility at fault, please try some troubleshooting steps.
 
 ## Developers & Credits
 [soryed](http://github.com/qyroke2) - fixed xylex vape
+<br/>
 [7GrandDad](https://github.com/7GrandDadPGN) - Original and Lead maintainer of the project - vaperoblox on Discord
 <br/>
 [rce-incorporated](https://github.com/rce-incorporated/Fiu) - Luau bytecode disassembly with modifications
