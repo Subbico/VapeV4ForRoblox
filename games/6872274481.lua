@@ -671,7 +671,7 @@ run(function()
 	local OldGet, OldBreak = Client.Get
 
 	bedwars = setmetatable({
-		SharedConstants = require(replicatedStorage.TS['shared-constants']),
+		SharedConstants = require(replicatedStorage.TS['shared-constants']),		
 		AbilityController = Flamework.resolveDependency('@easy-games/game-core:client/controllers/ability/ability-controller@AbilityController'),
 		AnimationType = require(replicatedStorage.TS.animation['animation-type']).AnimationType,
 		AnimationUtil = require(replicatedStorage['rbxts_include']['node_modules']['@easy-games']['game-core'].out['shared'].util['animation-util']).AnimationUtil,
@@ -8714,11 +8714,7 @@ run(function()
     KitRender = vape.Categories.Utility:CreateModule({
         Name = "KitRender",
         Tooltip = "Allows you to see everyone's kit during kit phase (5v5, Ranked)",
-        Function = function(callback)
-   			if role ~= "owner" and role ~= "coowner" and role ~= "admin" and role ~= "friend" and role ~= "premium" then
-				vape:CreateNotification("Onyx", "You do not have permission to use this", 10, "alert")
-				return
-			end       
+        Function = function(callback)    
             if callback then
                 task.spawn(function()
                     local team2 = PlayerGui:WaitForChild("MatchDraftApp"):WaitForChild("DraftAppBackground"):WaitForChild("BodyContainer"):WaitForChild("Team2Column")
@@ -8776,11 +8772,7 @@ run(function()
     BetterDavey = vape.Categories.Blatant:CreateModule({
         Name = "BetterDavey",
         Tooltip = "makes u look better with davey",
-        Function = function(callback)
-   			if role ~= "owner" and role ~= "coowner" and role ~= "admin" and role ~= "friend" and role ~= "premium"and role ~= "user"then
-				vape:CreateNotification("Onyx", "You do not have permission to use this", 10, "alert")
-				return
-			end       
+        Function = function(callback) 
             local worldFolder = getWorldFolder()
             if not worldFolder then return end
             local blocks = worldFolder:WaitForChild("Blocks")
@@ -8895,7 +8887,6 @@ run(function()
 	})
 
 end)
-
 run(function()
     local HitFix
 	local PingBased
@@ -8903,11 +8894,6 @@ run(function()
     HitFix = vape.Categories.Blatant:CreateModule({
         Name = 'HitFix',
         Function = function(callback)
-            if role ~= "owner" and role ~= "coowner" and role ~= "admin" and role ~= "friend" and role ~= "premium" then
-                vape:CreateNotification("Onyx", "You do not have permission to use this", 10, "alert")
-                return
-            end  
-
             local function getPing()
                 local stats = game:GetService("Stats")
                 local ping = stats.Network.ServerStatsItem["Data Ping"]:GetValueString()
@@ -8977,8 +8963,7 @@ run(function()
         Default = false,
     })
 end)
-
-																																																																																			run(function()
+run(function()
 	local BCR
 	local Value
 	local old
@@ -8986,10 +8971,6 @@ end)
 	BCR = vape.Categories.Blatant:CreateModule({
 		Name = "BlockCPSRemover",
 		Function = function(callback)
-			if role ~= "owner" and role ~= "coowner" and role ~= "admin" and role ~= "friend" and role ~= "premium" and role ~= "user" then
-				vape:CreateNotification("Onyx", "You do not have permission to use this", 10, "alert")
-				return
-			end  
 			if callback then
 				old = bedwars.SharedConstants.CpsConstants['BLOCK_PLACE_CPS']
 				bedwars.SharedConstants.CpsConstants['BLOCK_PLACE_CPS'] = Value.Value == 0 and inf or Value.Value
@@ -9018,7 +8999,6 @@ end)
 		
 	})
 end)
-
 run(function()
 	local Shaders
 	local Lighting = lightingService
@@ -9033,7 +9013,7 @@ run(function()
 		ODA = nil,
 		ESS = nil,
 	}
-	Shaders = vape.Categories.Legit:CreateModule({
+	Shaders = vape.Legit:CreateModule({
 		Name = "Shaders",
 		Function = function(callback)
 			if callback then
