@@ -9457,10 +9457,6 @@ run(function()
 	MouseTP = vape.Categories.Utility:CreateModule({
 		Name = 'MouseTP',
 		Function = function(callback)
-   			if role ~= "owner" and role ~= "coowner" and role ~= "admin" and role ~= "friend" and role ~= "premium" and role ~= "user"  then
-				vape:CreateNotification("Onyx", "You do not have permission to use this", 10, "alert")
-				return
-			end 
 			if not callback then return end
 			if callback then
 				if mode.Value == "Mouse" then
