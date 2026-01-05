@@ -1563,6 +1563,7 @@ run(function()
 							end
 						end
 						if BowCheck.Enabled then
+							print('bow check!',store.hand.toolType)
 							if store.hand.toolType == 'wood_bow' or store.hand.toolType == 'wood_crossbow' or store.hand.toolType == 'headhunter' then
 								print(store.hand.tool.Name)
 								local attackRange = 23
