@@ -9129,7 +9129,7 @@ run(function()
 	local mode
 	local pos
 	local function getNearestPlayer()
-		local character = entitylib.character
+		local character = lplr.Character
 		local hrp = character and character:FindFirstChild("HumanoidRootPart")
 		if not hrp then return nil end
 
