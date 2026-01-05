@@ -1527,12 +1527,11 @@ run(function()
 		Tooltip = 'Sets your sprinting to true.'
 	})
 end)
-	
 run(function()
 	local TriggerBot
 	local CPS
 	local rayParams = RaycastParams.new()
-	
+	local BowCheck
 	TriggerBot = vape.Categories.Combat:CreateModule({
 		Name = 'TriggerBot',
 		Function = function(callback)
@@ -1563,6 +1562,31 @@ run(function()
 								bedwars.SwordController:swingSwordAtMouse()
 							end
 						end
+						if BowCheck.Enabled then
+							if store.hand.toolType == 'wood_bow' or store.hand.toolType == 'wood_crossbow' or store.hand.toolType == 'headhunter' then
+								local attackRange = 23
+								rayParams.FilterDescendantsInstances = {lplr.Character}
+		
+								local unit = lplr:GetMouse().UnitRay
+								local localPos = entitylib.character.RootPart.Position
+								local rayRange = (attackRange)
+								local ray = bedwars.QueryUtil:raycast(unit.Origin, unit.Direction * 200, rayParams)
+								if ray and (localPos - ray.Instance.Position).Magnitude <= rayRange then
+									local limit = (attackRange)
+									for _, ent in entitylib.List do
+										doAttack = ent.Targetable and ray.Instance:IsDescendantOf(ent.Character) and (localPos - ent.RootPart.Position).Magnitude <= rayRange
+										if doAttack then
+											break
+										end
+									end
+								end
+		
+								doAttack = doAttack or bedwars.SwordController:getTargetInRegion(attackRange or 3.8 * 3, 0)
+								if doAttack then
+									mouse1click()
+								end
+							end
+						end
 					end
 	
 					task.wait(doAttack and 1 / CPS.GetRandomValue() or 0.016)
@@ -1578,6 +1602,7 @@ run(function()
 		DefaultMin = 7,
 		DefaultMax = 7
 	})
+	BowCheck = TriggerBot:CreateToggle({Name='BowCheck'})
 end)
 	
 run(function()
