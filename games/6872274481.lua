@@ -1564,6 +1564,7 @@ run(function()
 						end
 						if BowCheck.Enabled then
 							if store.hand.toolType == 'wood_bow' or store.hand.toolType == 'wood_crossbow' or store.hand.toolType == 'headhunter' then
+								print(store.hand.tool.Name)
 								local attackRange = 23
 								rayParams.FilterDescendantsInstances = {lplr.Character}
 		
@@ -1583,6 +1584,7 @@ run(function()
 		
 								doAttack = doAttack or bedwars.SwordController:getTargetInRegion(attackRange or 3.8 * 3, 0)
 								if doAttack then
+									print(doAttack)
 									mouse1click()
 								end
 							end
@@ -1602,7 +1604,7 @@ run(function()
 		DefaultMin = 7,
 		DefaultMax = 7
 	})
-	BowCheck = TriggerBot:CreateToggle({Name='BowCheck'})
+	BowCheck = TriggerBot:CreateToggle({Name='Bow Check'})
 end)
 	
 run(function()
