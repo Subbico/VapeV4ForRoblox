@@ -9514,3 +9514,21 @@ run(function()
 		List = {'Cloeset Player', 'Mouse'}
 	})
 end)
+
+run(function()
+	local HackerDetector
+	HackerDetector = vape.Categories.Utility:CreateModule({
+		Name = 'HackerDetector',
+		Function = function(callback)
+			task.spawn(function()
+				HackerDetector:Clean(vapeEvents.EntityDamageEvent.Event:Connect(function(damageTable)
+					if not entitylib.isAlive then return end
+					
+					local attacker = playersService:GetPlayerFromCharacter(damageTable.fromEntity)
+					local victim = playersService:GetPlayerFromCharacter(damageTable.entityInstance)
+					print(attacker,victim,httpService:JSONEncode(damageTable))
+				end))
+			end)
+		end
+	})
+end)
