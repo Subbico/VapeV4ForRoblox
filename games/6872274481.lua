@@ -1563,9 +1563,7 @@ run(function()
 							end
 						end
 						if BowCheck.Enabled then
-							print('bow check!',store.hand.toolType)
-							if store.hand.toolType == 'wood_bow' or store.hand.toolType == 'wood_crossbow' or store.hand.toolType == 'headhunter' then
-								print(store.hand.tool.Name)
+							if store.hand.toolType == 'bow' then
 								local attackRange = 23
 								rayParams.FilterDescendantsInstances = {lplr.Character}
 		
@@ -1585,7 +1583,6 @@ run(function()
 		
 								doAttack = doAttack or bedwars.SwordController:getTargetInRegion(attackRange or 3.8 * 3, 0)
 								if doAttack then
-									print(doAttack)
 									mouse1click()
 								end
 							end
