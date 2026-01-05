@@ -1563,7 +1563,7 @@ run(function()
 							end
 						end
 						if BowCheck.Enabled then
-							if store.hand.tool.Name == 'wood_bow' or store.hand.tool.Name == 'wood_crossbow' or store.hand.tool.Name == 'headhunter'  then
+							if store.hand.toolType == 'bow'  then
 								local attackRange = 23
 								rayParams.FilterDescendantsInstances = {lplr.Character}
 		
