@@ -1,3 +1,6 @@
+--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.
+--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.
+--This watermark is used to delete the file if its cached, remove it to make the file persist after vape updates.
 local loadstring = function(...)
 	local res, err = loadstring(...)
 	if err and vape then
@@ -14,7 +17,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/theyfearyin/VapeV4ForRoblox/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/poopparty/poopparty/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -380,9 +383,8 @@ end)
 
 run(function()
 	function whitelist:get(plr)
-		local plrstr = self.hashes[plr.Name..plr.UserId]
 		for _, v in self.data.WhitelistedUsers do
-			if v.hash == plrstr then
+			if v.userid == plr.UserId then  
 				return v.level, v.attackable or whitelist.localprio >= v.level, v.tags
 			end
 		end
@@ -430,20 +432,20 @@ run(function()
 					local oldchannel = textChatService.ChatInputBarConfiguration.TargetTextChannel
 					local newchannel = cloneref(game:GetService('RobloxReplicatedStorage')).ExperienceChat.WhisperChat:InvokeServer(v.UserId)
 					if newchannel then
-						newchannel:SendAsync('helloimusinginhaler')
+						newchannel:SendAsync('helloimusingyinv4')
 					end
 					textChatService.ChatInputBarConfiguration.TargetTextChannel = oldchannel
 				elseif replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents') then
-					replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer('/w '..v.Name..' helloimusinginhaler', 'All')
+					replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer('/w '..v.Name..' helloimusingyinv4', 'All')
 				end
 			end
 		end
 	end
 
 	function whitelist:process(msg, plr)
-		if plr == lplr and msg == 'helloimusinginhaler' then return true end
+		if plr == lplr and msg == 'helloimusingyinv4' then return true end
 
-		if self.localprio > 0 and not self.said[plr.Name] and msg == 'helloimusinginhaler' and plr ~= lplr then
+		if self.localprio > 0 and not self.said[plr.Name] and msg == 'helloimusingyinv4' and plr ~= lplr then
 			self.said[plr.Name] = true
 			notif('Vape', plr.Name..' is using vape!', 60)
 			self.customtags[plr.Name] = {{
@@ -515,22 +517,61 @@ run(function()
 
 		local exp = coreGui:FindFirstChild('ExperienceChat')
 		if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-			if exp and exp:WaitForChild('appLayout', 5) then
-				vape:Clean(exp:FindFirstChild('RCTScrollContentView', true).ChildAdded:Connect(function(obj)
-					local plr = playersService:GetPlayerByUserId(tonumber(obj.Name:split('-')[1]) or 0)
-					obj = obj:FindFirstChild('TextMessage', true)
-					if obj and obj:IsA('TextLabel') then
-						if plr then
-							self:newchat(obj, plr, true)
-							obj:GetPropertyChangedSignal('Text'):Wait()
-							self:newchat(obj, plr)
-						end
+			if exp TouchEnabled
+				task.spawn(function()
+					local maxWaitTime = 10
+					local startTime = tick()
+					local chatContainer
+					
+					while tick() - startTime < maxWaitTime and task.wait(0.1) do
+						chatContainer = exp:FindFirstChild('appLayout', true)
+						if chatContainer then
+							local scrollContent = chatContainer:FindFirstChild('RCTScrollContentView') or
+												chatContainer:FindFirstChild('ChatWindow') or
+												chatContainer:FindFirstChild('ChatContainer') or
+												chatContainer:FindFirstChild('MessageLog')
+							
+							if scrollContent then
+								vape:Clean(scrollContent.ChildAdded:Connect(function(obj)
+									local userIdStr = tostring(obj.Name):split('-')[1]
+									local plr = playersService:GetPlayerByUserId(tonumber(userIdStr) or 0)
+									local textLabel = obj:FindFirstChild('TextMessage', true) or 
+													obj:FindFirstChildWhichIsA('TextLabel', true)
+									if textLabel and textLabel:IsA('TextLabel') then
+										if plr then
+											self:newchat(textLabel, plr, true)
+											textLabel:GetPropertyChangedSignal('Text'):Wait()
+											self:newchat(textLabel, plr)
+										end
 
-						if obj.ContentText:sub(1, 35) == 'You are now privately chatting with' then
-							obj.Visible = false
+										if textLabel.ContentText and textLabel.ContentText:sub(1, 35) == 'You are now privately chatting with' then
+											textLabel.Visible = false
+										end
+									end
+								end))
+								break
+							end
 						end
 					end
-				end))
+					
+					if not chatContainer then
+						vape:Clean(exp.DescendantAdded:Connect(function(obj)
+							if obj:IsA('TextLabel') and obj.Name:find('Message') then
+								task.wait(0.1) 
+								local parent = obj.Parent
+								if parent and parent.Name:find('-') then
+									local userIdStr = tostring(parent.Name):split('-')[1]
+									local plr = playersService:GetPlayerByUserId(tonumber(userIdStr) or 0)
+									if plr then
+										self:newchat(obj, plr, true)
+										obj:GetPropertyChangedSignal('Text'):Wait()
+										self:newchat(obj, plr)
+									end
+								end
+							end
+						end))
+					end
+				end)
 			end
 		elseif replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents') then
 			pcall(function()
@@ -554,7 +595,7 @@ run(function()
 			local bubblechat = exp:WaitForChild('bubbleChat', 5)
 			if bubblechat then
 				vape:Clean(bubblechat.DescendantAdded:Connect(function(newbubble)
-					if newbubble:IsA('TextLabel') and newbubble.Text:find('helloimusinginhaler') then
+					if newbubble:IsA('TextLabel') and newbubble.Text:find('helloimusingyinv4') then
 						newbubble.Parent.Parent.Visible = false
 					end
 				end))
@@ -565,14 +606,14 @@ run(function()
 	function whitelist:update(first)
 		local suc = pcall(function()
 			local _, subbed = pcall(function()
-				return game:HttpGet('https://github.com/wrealaero/whitelists')
+				return game:HttpGet('https://github.com/theyfearyin/whitelists')
 			end)
 			local commit = subbed:find('currentOid')
 			commit = commit and subbed:sub(commit + 13, commit + 52) or nil
 			commit = commit and #commit == 40 and commit or 'main'
-			whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/wrealaero/whitelists/'..commit..'/PlayerWhitelist.json', true)
+			whitelist.textdata = game:HttpGet('https://raw.githubusercontent.com/theyfearyin/whitelists/'..commit..'/PlayerWhitelist.json', true)
 		end)
-		if not suc or not hash or not whitelist.get then return true end
+		if not suc or not whitelist.get then return true end
 		whitelist.loaded = true
 
 		if not first or whitelist.textdata ~= whitelist.olddata then
@@ -3335,10 +3376,164 @@ run(function()
 	local SearchRange
 	local StrafeRange
 	local YFactor
+	local MovementType
+	local JumpMode
+	local JumpHeight
+	local AirStrafing
+	local StrafeSpeed
 	local rayCheck = RaycastParams.new()
 	rayCheck.RespectCanCollide = true
 	local module, old
 	
+	local movementTypes = {
+		"Original",
+		"Aggressive",
+		"Defensive",
+		"ZigZag",
+		"SpinThisBitchHoe",
+		"RandomShit"
+	}
+	
+	local jumpModes = {
+		"None",
+		"Normal",
+		"Spam",
+		"Timed",
+		"RandomSHi",
+		"CantCatchMeBih"
+	}
+	
+	local strafeState = {
+		lastJumpTime = 0,
+		jumpCooldown = 0,
+		movementAngle = 0,
+		zigzagDirection = 1,
+		lastZigzagTime = 0,
+		randomSeed = math.random(1, 1000),
+		orbitDirection = 1,
+		inAir = false,
+		lastGroundTime = 0
+	}
+
+	local function calculateMovement(ent, root, targetPos, flymodEnabled, wallcheck)
+		local movementType = MovementType.Value
+		local jumpMode = JumpMode.Value
+		local localPosition = root.Position
+		local entityPos = Vector3.new(targetPos.X, localPosition.Y, targetPos.Z)
+		local vec = Vector3.zero
+		local shouldJump = false
+		local jumpPower = JumpHeight.Value / 100
+		
+		if movementType == "Original" then
+			local yFactor = math.abs(localPosition.Y - targetPos.Y) * (YFactor.Value / 100)
+			local newPos = entityPos + (CFrame.Angles(0, math.rad(strafeState.movementAngle), 0).LookVector * (StrafeRange.Value - yFactor))
+			vec = ((newPos - localPosition) * Vector3.new(1, 0, 1)).Unit
+			strafeState.movementAngle = (strafeState.movementAngle + (StrafeSpeed.Value * 0.5)) % 360
+			
+		elseif movementType == "Aggressive" then
+			local closeRange = StrafeRange.Value * 0.7
+			local angleIncrement = StrafeSpeed.Value * 0.8
+			local newPos = entityPos + (CFrame.Angles(0, math.rad(strafeState.movementAngle), 0).LookVector * closeRange)
+			vec = ((newPos - localPosition) * Vector3.new(1, 0, 1)).Unit
+			strafeState.movementAngle = (strafeState.movementAngle + angleIncrement) % 360
+			
+		elseif movementType == "Defensive" then
+			local wideRange = StrafeRange.Value * 1.3
+			local angleIncrement = StrafeSpeed.Value * 0.3
+			local newPos = entityPos + (CFrame.Angles(0, math.rad(strafeState.movementAngle), 0).LookVector * wideRange)
+			vec = ((newPos - localPosition) * Vector3.new(1, 0, 1)).Unit
+			strafeState.movementAngle = (strafeState.movementAngle + angleIncrement) % 360
+			
+		elseif movementType == "ZigZag" then
+			if tick() - strafeState.lastZigzagTime > 0.3 then
+				strafeState.zigzagDirection = -strafeState.zigzagDirection
+				strafeState.lastZigzagTime = tick()
+			end
+			
+			local sideOffset = strafeState.zigzagDirection * (StrafeRange.Value * 0.5)
+			local rightVector = CFrame.lookAt(localPosition, entityPos).RightVector
+			local newPos = entityPos + (rightVector * sideOffset)
+			vec = ((newPos - localPosition) * Vector3.new(1, 0, 1)).Unit
+			
+		elseif movementType == "Orbital" then
+			local orbitSpeed = StrafeSpeed.Value * 0.4
+			strafeState.orbitDirection = (localPosition - entityPos).Magnitude > StrafeRange.Value * 1.2 and 1 or strafeState.orbitDirection
+			strafeState.orbitDirection = (localPosition - entityPos).Magnitude < StrafeRange.Value * 0.8 and -1 or strafeState.orbitDirection
+			
+			local newPos = entityPos + (CFrame.Angles(0, math.rad(strafeState.movementAngle), 0).LookVector * StrafeRange.Value)
+			vec = ((newPos - localPosition) * Vector3.new(1, 0, 1)).Unit
+			strafeState.movementAngle = (strafeState.movementAngle + (orbitSpeed * strafeState.orbitDirection)) % 360
+			
+		elseif movementType == "Random" then
+			math.randomseed(strafeState.randomSeed + math.floor(tick()))
+			local randomAngle = math.random(0, 360)
+			local randomRange = math.random(StrafeRange.Value * 0.7, StrafeRange.Value * 1.3)
+			local newPos = entityPos + (CFrame.Angles(0, math.rad(randomAngle), 0).LookVector * randomRange)
+			vec = ((newPos - localPosition) * Vector3.new(1, 0, 1)).Unit
+			
+			if math.random(1, 20) == 1 then
+				strafeState.randomSeed = math.random(1, 1000)
+			end
+		end
+		
+		local currentTime = tick()
+		local distanceToTarget = (localPosition - targetPos).Magnitude
+		
+		if jumpMode == "Normal" then
+			if not strafeState.inAir and currentTime - strafeState.lastJumpTime > 1.5 then
+				shouldJump = math.random(1, 4) == 1
+			end
+			
+		elseif jumpMode == "Spam" then
+			if currentTime - strafeState.lastJumpTime > 0.4 then
+				shouldJump = true
+			end
+			
+		elseif jumpMode == "Timed" then
+			if currentTime - strafeState.lastJumpTime > 1.0 then
+				shouldJump = true
+			end
+			
+		elseif jumpMode == "Combat" then
+			if distanceToTarget < StrafeRange.Value * 1.2 and currentTime - strafeState.lastJumpTime > 0.8 then
+				shouldJump = true
+			end
+			
+		elseif jumpMode == "AntiAim" then
+			if math.random(1, 15) == 1 and currentTime - strafeState.lastJumpTime > 0.5 then
+				shouldJump = true
+			end
+		end
+		
+		if AirStrafing.Enabled and strafeState.inAir then
+			vec = vec * 0.7
+			
+			if jumpMode ~= "None" then
+				vec = vec + Vector3.new(0, 0.1 * jumpPower, 0)
+			end
+		end
+		
+		return vec, shouldJump
+	end
+
+	local function performJump(shouldJump, humanoid)
+		if shouldJump and humanoid and humanoid.FloorMaterial ~= Enum.Material.Air then
+			humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+			strafeState.lastJumpTime = tick()
+			strafeState.inAir = true
+			strafeState.lastGroundTime = tick()
+		end
+	end
+
+	local function updateAirState(humanoid)
+		if humanoid then
+			strafeState.inAir = humanoid.FloorMaterial == Enum.Material.Air
+			if not strafeState.inAir then
+				strafeState.lastGroundTime = tick()
+			end
+		end
+	end
+
 	TargetStrafe = vape.Categories.Blatant:CreateModule({
 		Name = 'TargetStrafe',
 		Function = function(callback)
@@ -3352,6 +3547,7 @@ run(function()
 				
 				old = module.moveFunction
 				local flymod, ang, oldent = vape.Modules.Fly or {Enabled = false}
+				
 				module.moveFunction = function(self, vec, face)
 					local wallcheck = Targets.Walls.Enabled
 					local ent = not inputService:IsKeyDown(Enum.KeyCode.S) and entitylib.EntityPosition({
@@ -3371,7 +3567,16 @@ run(function()
 							local factor, localPosition = 0, root.Position
 							if ent ~= oldent then
 								ang = math.deg(select(2, CFrame.lookAt(targetPos, localPosition):ToEulerAnglesYXZ()))
+								strafeState.movementAngle = ang
 							end
+							
+							updateAirState(entitylib.character.Humanoid)
+							
+							local newVec, shouldJump = calculateMovement(ent, root, targetPos, flymod.Enabled, wallcheck)
+							vec = newVec
+							
+							performJump(shouldJump, entitylib.character.Humanoid)
+							
 							local yFactor = math.abs(localPosition.Y - targetPos.Y) * (YFactor.Value / 100)
 							local entityPos = Vector3.new(targetPos.X, localPosition.Y, targetPos.Z)
 							local newPos = entityPos + (CFrame.Angles(0, math.rad(ang), 0).LookVector * (StrafeRange.Value - yFactor))
@@ -3396,7 +3601,6 @@ run(function()
 							end
 	
 							ang += factor % 360
-							vec = ((newPos - localPosition) * Vector3.new(1, 0, 1)).Unit
 							vec = vec == vec and vec or Vector3.zero
 							TargetStrafeVector = vec
 						else
@@ -3413,14 +3617,27 @@ run(function()
 					module.moveFunction = old
 				end
 				TargetStrafeVector = nil
+				strafeState = {
+					lastJumpTime = 0,
+					jumpCooldown = 0,
+					movementAngle = 0,
+					zigzagDirection = 1,
+					lastZigzagTime = 0,
+					randomSeed = math.random(1, 1000),
+					orbitDirection = 1,
+					inAir = false,
+					lastGroundTime = 0
+				}
 			end
 		end,
-		Tooltip = 'Automatically strafes around the opponent'
+		Tooltip = 'Automatically strafes around the opponent with multiple movement types'
 	})
+	
 	Targets = TargetStrafe:CreateTargets({
 		Players = true,
 		Walls = true
 	})
+	
 	SearchRange = TargetStrafe:CreateSlider({
 		Name = 'Search Range',
 		Min = 1,
@@ -3430,6 +3647,7 @@ run(function()
 			return val == 1 and 'stud' or 'studs'
 		end
 	})
+	
 	StrafeRange = TargetStrafe:CreateSlider({
 		Name = 'Strafe Range',
 		Min = 1,
@@ -3439,12 +3657,57 @@ run(function()
 			return val == 1 and 'stud' or 'studs'
 		end
 	})
+	
 	YFactor = TargetStrafe:CreateSlider({
 		Name = 'Y Factor',
 		Min = 0,
 		Max = 100,
 		Default = 100,
 		Suffix = '%'
+	})
+	
+	StrafeSpeed = TargetStrafe:CreateSlider({
+		Name = 'Strafe Speed',
+		Min = 1,
+		Max = 10,
+		Default = 5,
+		Function = function(val)
+		end
+	})
+	
+	MovementType = TargetStrafe:CreateDropdown({
+		Name = 'Movement Type',
+		List = movementTypes,
+		Function = function(val)
+			strafeState.movementAngle = 0
+			strafeState.zigzagDirection = 1
+			strafeState.lastZigzagTime = 0
+		end
+	})
+	
+	JumpMode = TargetStrafe:CreateDropdown({
+		Name = 'Jump Mode',
+		List = jumpModes,
+		Function = function(val)
+			strafeState.lastJumpTime = 0
+		end
+	})
+	
+	JumpHeight = TargetStrafe:CreateSlider({
+		Name = 'Jump Power',
+		Min = 50,
+		Max = 150,
+		Default = 100,
+		Suffix = '%',
+		Tooltip = 'Adjusts jump intensity for air strafing'
+	})
+	
+	AirStrafing = TargetStrafe:CreateToggle({
+		Name = 'Air Strafing',
+		Function = function(callback)
+		end,
+		Default = true,
+		Tooltip = 'Adjust movement when in air for better control'
 	})
 end)
 	
@@ -6150,7 +6413,7 @@ run(function()
 				
 				local ind = 1
 				repeat
-					local message = (#Lines.ListEnabled > 0 and Lines.ListEnabled[math.random(1, #Lines.ListEnabled)] or 'vxpe on top')
+					local message = (#Lines.ListEnabled > 0 and Lines.ListEnabled[math.random(1, #Lines.ListEnabled)] or 'aerov4 on top')
 					if Mode.Value == 'Order' and #Lines.ListEnabled > 0 then
 						message = Lines.ListEnabled[ind] or Lines.ListEnabled[1]
 						ind = (ind % #Lines.ListEnabled) + 1
@@ -7922,3 +8185,30 @@ run(function()
 	
 end)
 	
+	
+run(function()
+    local PromptButtonHoldBegan = nil
+    local ProximityPromptService = cloneref(game:GetService('ProximityPromptService'))
+
+    local InstantPP = vape.Categories.Utility:CreateModule({
+        Name = 'InstantPP',
+        Function = function(callback)
+            if callback then
+                if fireproximityprompt then
+                    PromptButtonHoldBegan = ProximityPromptService.PromptButtonHoldBegan:Connect(function(prompt)
+                        fireproximityprompt(prompt)
+                    end)
+                else
+                    errorNotification('InstantPP', 'Your exploit does not support this command (missing fireproximityprompt)', 5)
+                    InstantPP:Toggle()
+                end
+            else
+                if PromptButtonHoldBegan ~= nil then
+                    PromptButtonHoldBegan:Disconnect()
+                    PromptButtonHoldBegan = nil
+                end
+            end
+        end,
+        Tooltip = 'Instantly activates proximity prompts.'
+    })
+end)
