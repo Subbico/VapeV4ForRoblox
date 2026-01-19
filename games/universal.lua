@@ -17,7 +17,7 @@ end
 local function downloadFile(path, func)
 	if not isfile(path) then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/poopparty/poopparty/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/theyfearyin/VapeV4ForRoblox/'..readfile('newvape/profiles/commit.txt')..'/'..select(1, path:gsub('newvape/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -384,7 +384,7 @@ end)
 run(function()
 	function whitelist:get(plr)
 		for _, v in self.data.WhitelistedUsers do
-			if v.userid == plr.UserId then  
+			if v.userid == plr.UserId then
 				return v.level, v.attackable or whitelist.localprio >= v.level, v.tags
 			end
 		end
@@ -425,27 +425,14 @@ run(function()
 				vape.Uninject = function()
 					notif('Vape', 'No escaping the private members :)', 10)
 				end
-				if joined then
-					task.wait(10)
-				end
-				if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-					local oldchannel = textChatService.ChatInputBarConfiguration.TargetTextChannel
-					local newchannel = cloneref(game:GetService('RobloxReplicatedStorage')).ExperienceChat.WhisperChat:InvokeServer(v.UserId)
-					if newchannel then
-						newchannel:SendAsync('helloimusingyinv4')
-					end
-					textChatService.ChatInputBarConfiguration.TargetTextChannel = oldchannel
-				elseif replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents') then
-					replicatedStorage.DefaultChatSystemChatEvents.SayMessageRequest:FireServer('/w '..v.Name..' helloimusingyinv4', 'All')
-				end
 			end
 		end
 	end
 
 	function whitelist:process(msg, plr)
-		if plr == lplr and msg == 'helloimusingyinv4' then return true end
+		if plr == lplr and msg == 'helloimusinginhaler' then return true end
 
-		if self.localprio > 0 and not self.said[plr.Name] and msg == 'helloimusingyinv4' and plr ~= lplr then
+		if self.localprio > 0 and not self.said[plr.Name] and msg == 'helloimusinginhaler' and plr ~= lplr then
 			self.said[plr.Name] = true
 			notif('Vape', plr.Name..' is using vape!', 60)
 			self.customtags[plr.Name] = {{
@@ -517,61 +504,25 @@ run(function()
 
 		local exp = coreGui:FindFirstChild('ExperienceChat')
 		if textChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-			if exp TouchEnabled
-				task.spawn(function()
-					local maxWaitTime = 10
-					local startTime = tick()
-					local chatContainer
-					
-					while tick() - startTime < maxWaitTime and task.wait(0.1) do
-						chatContainer = exp:FindFirstChild('appLayout', true)
-						if chatContainer then
-							local scrollContent = chatContainer:FindFirstChild('RCTScrollContentView') or
-												chatContainer:FindFirstChild('ChatWindow') or
-												chatContainer:FindFirstChild('ChatContainer') or
-												chatContainer:FindFirstChild('MessageLog')
-							
-							if scrollContent then
-								vape:Clean(scrollContent.ChildAdded:Connect(function(obj)
-									local userIdStr = tostring(obj.Name):split('-')[1]
-									local plr = playersService:GetPlayerByUserId(tonumber(userIdStr) or 0)
-									local textLabel = obj:FindFirstChild('TextMessage', true) or 
-													obj:FindFirstChildWhichIsA('TextLabel', true)
-									if textLabel and textLabel:IsA('TextLabel') then
-										if plr then
-											self:newchat(textLabel, plr, true)
-											textLabel:GetPropertyChangedSignal('Text'):Wait()
-											self:newchat(textLabel, plr)
-										end
+			if exp and exp:WaitForChild('appLayout', 5) then
+				local scrollContent = exp:FindFirstChild('RCTScrollContentView', true)
+				if scrollContent then
+					vape:Clean(scrollContent.ChildAdded:Connect(function(obj)
+						local plr = playersService:GetPlayerByUserId(tonumber(obj.Name:split('-')[1]) or 0)
+						obj = obj:FindFirstChild('TextMessage', true)
+						if obj and obj:IsA('TextLabel') then
+							if plr then
+								self:newchat(obj, plr, true)
+								obj:GetPropertyChangedSignal('Text'):Wait()
+								self:newchat(obj, plr)
+							end
 
-										if textLabel.ContentText and textLabel.ContentText:sub(1, 35) == 'You are now privately chatting with' then
-											textLabel.Visible = false
-										end
-									end
-								end))
-								break
+							if obj.ContentText:sub(1, 35) == 'You are now privately chatting with' then
+								obj.Visible = false
 							end
 						end
-					end
-					
-					if not chatContainer then
-						vape:Clean(exp.DescendantAdded:Connect(function(obj)
-							if obj:IsA('TextLabel') and obj.Name:find('Message') then
-								task.wait(0.1) 
-								local parent = obj.Parent
-								if parent and parent.Name:find('-') then
-									local userIdStr = tostring(parent.Name):split('-')[1]
-									local plr = playersService:GetPlayerByUserId(tonumber(userIdStr) or 0)
-									if plr then
-										self:newchat(obj, plr, true)
-										obj:GetPropertyChangedSignal('Text'):Wait()
-										self:newchat(obj, plr)
-									end
-								end
-							end
-						end))
-					end
-				end)
+					end))
+				end
 			end
 		elseif replicatedStorage:FindFirstChild('DefaultChatSystemChatEvents') then
 			pcall(function()
@@ -595,9 +546,6 @@ run(function()
 			local bubblechat = exp:WaitForChild('bubbleChat', 5)
 			if bubblechat then
 				vape:Clean(bubblechat.DescendantAdded:Connect(function(newbubble)
-					if newbubble:IsA('TextLabel') and newbubble.Text:find('helloimusingyinv4') then
-						newbubble.Parent.Parent.Visible = false
-					end
 				end))
 			end
 		end
