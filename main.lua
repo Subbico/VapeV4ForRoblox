@@ -2,10 +2,108 @@ repeat task.wait() until game:IsLoaded()
 if shared.vape then shared.vape:Uninject() end
 
 if identifyexecutor then
-	if table.find({'Argon', 'Volt', 'Wave'}, ({identifyexecutor()})[1]) then
+	if table.find({'Argon', 'Wave'}, ({identifyexecutor()})[1]) then
 		getgenv().setthreadidentity = nil
 	end
 end
+
+local function validateSecurity()
+    local HttpService = game:GetService("HttpService")
+    
+    if not isfile('newvape/security/validated') then
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "security error",
+            Text = "please use right log in first",
+            Duration = 5
+        })
+        return false, nil
+    end
+    
+    local validationContent = readfile('newvape/security/validated')
+    local success, validationData = pcall(function()
+        return HttpService:JSONDecode(validationContent)
+    end)
+    
+    if not success or not validationData then
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "security error",
+            Text = "corrupted validation file try to log in again",
+            Duration = 5
+        })
+        return false, nil
+    end
+    
+    if not validationData.username then
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "security error",
+            Text = "username missing from validation file",
+            Duration = 5
+        })
+        return false, nil
+    end
+    
+    local ACCOUNT_SYSTEM_URL = "https://raw.githubusercontent.com/theyfearyin/VapeV4ForRoblox/main/AccountSystem.lua"
+    
+    local function fetchAccounts()
+        local success, response = pcall(function()
+            return game:HttpGet(ACCOUNT_SYSTEM_URL)
+        end)
+        if success and response then
+            local accountsTable = loadstring(response)()
+            if accountsTable and accountsTable.Accounts then
+                return accountsTable.Accounts
+            end
+        end
+        return nil
+    end
+    
+    local accounts = fetchAccounts()
+    if not accounts then
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "connection error",
+            Text = "cant verify account status",
+            Duration = 5
+        })
+        return false, nil
+    end
+    
+    local accountValid = false
+    local accountActive = false
+    for _, account in pairs(accounts) do
+        if account.Username == validationData.username then
+            accountValid = true
+            accountActive = account.IsActive == true
+            break
+        end
+    end
+    
+    if not accountValid then
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "access taken",
+            Text = "your account is no longer authorized",
+            Duration = 5
+        })
+        return false, nil
+    end
+    
+    if not accountActive then
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "account inactive",
+            Text = "your account is currently inactive",
+            Duration = 5
+        })
+        return false, nil
+    end
+    
+    return true, validationData.username
+end
+
+local securityPassed, validatedUsername = validateSecurity()
+if not securityPassed then
+    return
+end
+
+shared.ValidatedUsername = validatedUsername
 
 local vape
 local loadstring = function(...)
@@ -43,6 +141,70 @@ local function downloadFile(path, func)
 	return (func or readfile)(path)
 end
 
+local function checkAccountActive()
+    local ACCOUNT_SYSTEM_URL = "https://raw.githubusercontent.com/theyfearyin/VapeV4ForRoblox/main/AccountSystem.lua"
+    
+    local function fetchAccounts()
+        local success, response = pcall(function()
+            return game:HttpGet(ACCOUNT_SYSTEM_URL)
+        end)
+        if success and response then
+            local accountsTable = loadstring(response)()
+            if accountsTable and accountsTable.Accounts then
+                return accountsTable.Accounts
+            end
+        end
+        return nil
+    end
+    
+    local accounts = fetchAccounts()
+    if not accounts then 
+        return true 
+    end
+    
+    for _, account in pairs(accounts) do
+        if account.Username == shared.ValidatedUsername then
+            return account.IsActive == true
+        end
+    end
+    return false
+end
+
+local activeCheckRunning = false
+local function startActiveCheck()
+    if activeCheckRunning then return end
+    activeCheckRunning = true
+    
+    while task.wait(30) do
+        if shared.vape then
+            local isActive = checkAccountActive()
+            
+            if not isActive then
+                game.StarterGui:SetCore("SendNotification", {
+                    Title = "access taken",
+                    Text = "your account has been deactivated.",
+                    Duration = 5
+                })
+                
+                task.wait(2)
+                
+                if shared.vape and shared.vape.Uninject then
+                    shared.vape:Uninject()
+                else
+                    shared.vape = nil
+                    if getgenv and getgenv().vape then
+                        getgenv().vape = nil
+                    end
+                end
+                break
+            end
+        else
+            break
+        end
+    end
+    activeCheckRunning = false
+end
+
 local function finishLoading()
 	vape.Init = nil
 	vape:Load()
@@ -52,6 +214,12 @@ local function finishLoading()
 			task.wait(10)
 		until not vape.Loaded
 	end)
+
+    if shared.ValidatedUsername then
+        task.spawn(function()
+            startActiveCheck()
+        end)
+    end
 
 	local teleportedServers
 	vape:Clean(playersService.LocalPlayer.OnTeleport:Connect(function()
@@ -79,7 +247,7 @@ local function finishLoading()
 	if not shared.vapereload then
 		if not vape.Categories then return end
 		if vape.Categories.Main.Options['GUI bind indicator'].Enabled then
-			vape:CreateNotification('Finished Loading', vape.VapeButton and 'Press the button in the top right to open GUI' or 'Press '..table.concat(vape.Keybind, ' + '):upper()..' to open GUI', 5)
+			vape:CreateNotification('Finished Loading', 'wsg, '..shared.ValidatedUsername..'! '..(vape.VapeButton and 'Press the button in the top right to open GUI' or 'Press '..table.concat(vape.Keybind, ' + '):upper()..' to open GUI'), 5)
 		end
 	end
 end
