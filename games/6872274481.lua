@@ -4299,9 +4299,10 @@ run(function()
 			end, 6, true)
 		end,
 		pinata = function()
+			notif('AutoKit','please note lucia now has a range check now.',6,"warning")
 			kitCollection(lplr.Name..':pinata', function(v)
 				if getItem('candy') then
-					bedwars.Client:Get(remotes.DepositPinata):CallServer(v)
+					bedwars.Client:Get('DepositCoins'):CallServer(v)
 				end
 			end, 6, true)
 		end,
