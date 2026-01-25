@@ -9285,4 +9285,4 @@ run(function()
 	})
 end)
 
-
+vape:Remove('AutoClicker')
