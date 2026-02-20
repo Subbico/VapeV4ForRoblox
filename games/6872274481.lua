@@ -2927,6 +2927,7 @@ run(function()
 	local Targets
 	local FOV
 	local OtherProjectiles
+	local Blacklist
 	local rayCheck = RaycastParams.new()
 	rayCheck.FilterType = Enum.RaycastFilterType.Include
 	rayCheck.FilterDescendantsInstances = {workspace:FindFirstChild('Map')}
@@ -2955,6 +2956,11 @@ run(function()
 						end
 	
 						if (not OtherProjectiles.Enabled) and not projmeta.projectile:find('arrow') then
+							return old(...)
+						end
+
+						-- blacklist check
+						if Blacklist and table.find(Blacklist.ListEnabled, projmeta.projectile) then
 							return old(...)
 						end
 	
@@ -3020,7 +3026,18 @@ run(function()
 	})
 	OtherProjectiles = ProjectileAimbot:CreateToggle({
 		Name = 'Other Projectiles',
-		Default = true
+		Default = true,
+		Function = function(call)
+			if Blacklist then
+				Blacklist.Object.Visible = call
+			end
+		end
+	})
+
+	Blacklist = ProjectileAimbot:CreateTextList({
+		Name = 'Blacklist',
+		Darker = true,
+		Default = {'telepearl'}
 	})
 end)
 	
