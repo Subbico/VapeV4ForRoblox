@@ -4458,8 +4458,6 @@ end)
 	
 run(function()
 	local AutoPearl
-	local LegitSwitch
-
 	local rayCheck = RaycastParams.new()
 	rayCheck.RespectCanCollide = true
 	local projectileRemote = {InvokeServer = function() end}
@@ -4468,23 +4466,13 @@ run(function()
 	end)
 	
 	local function firePearl(pos, spot, item)
-		if LegitSwitch.Enabled then
-			for i, v in store.inventory.hotbar do
-				if v.item and v.item.tool == item.tool and i ~= (store.inventory.hotbarSlot + 1) then 
-					hotbarSwitch(i - 1)
-					task.wait(0.1)
-					break
-				end
-			end
-		else
-			switchItem(item.tool)
-		end
+		switchItem(item.tool)
 		local meta = bedwars.ProjectileMeta.telepearl
-		local calc = prediction.SolveTrajectory(pos, meta.launchVelocity, meta.gravitationalAcceleration, spot, Vector3.zero, workspace.Gravity, 0, 0, nil, false, lplr:GetNetworkPing())
-
+		local calc = prediction.SolveTrajectory(pos, meta.launchVelocity, meta.gravitationalAcceleration, spot, Vector3.zero, workspace.Gravity, 0, 0)
+	
 		if calc then
 			local dir = CFrame.lookAt(pos, calc).LookVector * meta.launchVelocity
-			--bedwars.ProjectileController:createLocalProjectile(meta, 'telepearl', 'telepearl', pos, nil, dir, {drawDurationSeconds = 1})
+			bedwars.ProjectileController:createLocalProjectile(meta, 'telepearl', 'telepearl', pos, nil, dir, {drawDurationSeconds = 1})
 			projectileRemote:InvokeServer(item.tool, 'telepearl', 'telepearl', pos, pos, dir, httpService:GenerateGUID(true), {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)}, workspace:GetServerTimeNow() - 0.045)
 		end
 	
@@ -4494,7 +4482,7 @@ run(function()
 	end
 	
 	AutoPearl = vape.Categories.Utility:CreateModule({
-		Name = 'Auto Pearl',
+		Name = 'AutoPearl',
 		Function = function(callback)
 			if callback then
 				local check
@@ -4505,13 +4493,12 @@ run(function()
 						rayCheck.FilterDescendantsInstances = {lplr.Character, gameCamera, AntiFallPart}
 						rayCheck.CollisionGroup = root.CollisionGroup
 	
-						if pearl and root.Velocity.Y < -80 and not workspace:Raycast(root.Position, Vector3.new(0, -200, 0), rayCheck) then
+						if pearl and root.Velocity.Y < -100 and not workspace:Raycast(root.Position, Vector3.new(0, -200, 0), rayCheck) then
 							if not check then
 								check = true
 								local ground = getNearGround(20)
 	
 								if ground then
-									getgenv().CancelSwitch = os.clock() + 0.3
 									firePearl(root.Position, ground, pearl)
 								end
 							end
@@ -4524,10 +4511,6 @@ run(function()
 			end
 		end,
 		Tooltip = 'Automatically throws a pearl onto nearby ground after\nfalling a certain distance.'
-	})
-
-	LegitSwitch = AutoPearl:CreateToggle({
-		Name = 'Legit Switch'
 	})
 end)
 	
@@ -7506,41 +7489,6 @@ run(function()
 	LimitItem = Breaker:CreateToggle({
 		Name = 'Limit to items',
 		Tooltip = 'Only breaks when tools are held'
-	})
-end)
-	
-run(function()
-	local BedBreakEffect
-	local Mode
-	local List
-	local NameToId = {}
-	
-	BedBreakEffect = vape.Categories.Legit:CreateModule({
-		Name = 'Bed Break Effect',
-		Function = function(callback)
-			if callback then
-				BedBreakEffect:Clean(vapeEvents.BedwarsBedBreak.Event:Connect(function(data)
-					firesignal(bedwars.Client:Get('BedBreakEffectTriggered').instance.OnClientEvent, {
-						player = data.player,
-						position = data.bedBlockPosition * 3,
-						effectType = NameToId[List.Value],
-						teamId = data.brokenBedTeam.id,
-						centerBedPosition = data.bedBlockPosition * 3
-					})
-				end))
-			end
-		end,
-		Tooltip = 'Custom bed break effects'
-	})
-	local BreakEffectName = {}
-	for i, v in bedwars.BedBreakEffectMeta do
-		table.insert(BreakEffectName, v.name)
-		NameToId[v.name] = i
-	end
-	table.sort(BreakEffectName)
-	List = BedBreakEffect:CreateDropdown({
-		Name = 'Effect',
-		List = BreakEffectName
 	})
 end)
 	
