@@ -4475,6 +4475,8 @@ end)
 	
 run(function()
 	local AutoPearl
+	local LegitSwitch
+
 	local rayCheck = RaycastParams.new()
 	rayCheck.RespectCanCollide = true
 	local projectileRemote = {InvokeServer = function() end}
@@ -4483,13 +4485,22 @@ run(function()
 	end)
 	
 	local function firePearl(pos, spot, item)
-		switchItem(item.tool)
+		if LegitSwitch.Enabled then
+			for i, v in store.inventory.hotbar do
+				if v.item and v.item.tool == item.tool and i ~= (store.inventory.hotbarSlot + 1) then 
+					hotbarSwitch(i - 1)
+					task.wait(0.1)
+					break
+				end
+			end
+		else
+			switchItem(item.tool)
+		end
 		local meta = bedwars.ProjectileMeta.telepearl
-		local calc = prediction.SolveTrajectory(pos, meta.launchVelocity, meta.gravitationalAcceleration, spot, Vector3.zero, workspace.Gravity, 0, 0)
-	
+		local calc = prediction.SolveTrajectory(pos, meta.launchVelocity, meta.gravitationalAcceleration, spot, Vector3.zero, workspace.Gravity, 0, 0, nil, false, lplr:GetNetworkPing())
+
 		if calc then
 			local dir = CFrame.lookAt(pos, calc).LookVector * meta.launchVelocity
-			bedwars.ProjectileController:createLocalProjectile(meta, 'telepearl', 'telepearl', pos, nil, dir, {drawDurationSeconds = 1})
 			projectileRemote:InvokeServer(item.tool, 'telepearl', 'telepearl', pos, pos, dir, httpService:GenerateGUID(true), {drawDurationSeconds = 1, shotId = httpService:GenerateGUID(false)}, workspace:GetServerTimeNow() - 0.045)
 		end
 	
@@ -4514,8 +4525,9 @@ run(function()
 							if not check then
 								check = true
 								local ground = getNearGround(20)
-	
+
 								if ground then
+									getgenv().CancelSwitch = os.clock() + 0.3
 									firePearl(root.Position, ground, pearl)
 								end
 							end
@@ -4528,6 +4540,10 @@ run(function()
 			end
 		end,
 		Tooltip = 'Automatically throws a pearl onto nearby ground after\nfalling a certain distance.'
+	})
+
+	LegitSwitch = AutoPearl:CreateToggle({
+		Name = 'Legit Switch'
 	})
 end)
 	
