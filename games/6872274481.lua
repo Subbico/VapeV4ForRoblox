@@ -2935,7 +2935,7 @@ run(function()
 
 	local old
 
-	local ProjectileAimbot = vape.Categories.Combat:CreateModule({
+	local ProjectileAimbot = vape.Categories.Blatant:CreateModule({
 		Name = 'SilentAim',
 		Function = function(callback)
 			if callback then
