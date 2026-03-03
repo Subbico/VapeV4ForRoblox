@@ -4055,69 +4055,6 @@ run(function()
 	end
 	
 	local AutoKitFunctions = {
-		blood_assassin = function()
-				local hitPlayers = {} 
-				
-				AutoKit:Clean(vapeEvents.EntityDamageEvent.Event:Connect(function(damageTable)
-					if not entitylib.isAlive then return end
-					
-					local attacker = playersService:GetPlayerFromCharacter(damageTable.fromEntity)
-					local victim = playersService:GetPlayerFromCharacter(damageTable.entityInstance)
-				
-					if attacker == lplr and victim and victim ~= lplr then
-						hitPlayers[victim] = true
-						
-						local storeState = bedwars.Store:getState()
-						local activeContract = storeState.Kit.activeContract
-						local availableContracts = storeState.Kit.availableContracts or {}
-						
-						if not activeContract then
-							for _, contract in availableContracts do
-								if contract.target == victim then
-									bedwars.Client:Get('BloodAssassinSelectContract'):SendToServer({
-										contractId = contract.id
-									})
-									break
-								end
-							end
-						end
-					end
-				end))
-				
-				repeat
-					if entitylib.isAlive then
-						local storeState = bedwars.Store:getState()
-						local activeContract = storeState.Kit.activeContract
-						local availableContracts = storeState.Kit.availableContracts or {}
-						
-						if not activeContract and #availableContracts > 0 then
-							local bestContract = nil
-							local highestDifficulty = 0
-							
-							for _, contract in availableContracts do
-								if hitPlayers[contract.target] then
-									if contract.difficulty > highestDifficulty then
-										bestContract = contract
-										highestDifficulty = contract.difficulty
-									end
-								end
-							end
-							
-							if bestContract then
-								bedwars.Client:Get('BloodAssassinSelectContract'):SendToServer({
-									contractId = bestContract.id
-								})
-								task.wait(0.5)
-							end
-						end
-					else
-						table.clear(hitPlayers)
-					end
-					task.wait(1)
-				until not AutoKit.Enabled
-				
-				table.clear(hitPlayers)
-		end,
 		battery = function()
 			repeat
 				if entitylib.isAlive then
@@ -4316,10 +4253,9 @@ run(function()
 			end, 6, true)
 		end,
 		pinata = function()
-			notif('AutoKit','please note lucia now has a range check now.',6,"warning")
 			kitCollection(lplr.Name..':pinata', function(v)
 				if getItem('candy') then
-					bedwars.Client:Get('DepositCoins'):CallServer(v)
+					bedwars.Client:Get(remotes.DepositPinata):CallServer(v)
 				end
 			end, 6, true)
 		end,
@@ -4444,9 +4380,21 @@ run(function()
 			until not AutoKit.Enabled
 		end
 	}
+
+	local sortTable, Names = {}, {}
+	for i in AutoKitFunctions do
+		table.insert(sortTable, i)
+	end
+	table.sort(sortTable, function(a, b)
+		return bedwars.BedwarsKitMeta[a].name < bedwars.BedwarsKitMeta[b].name
+	end)
+	for _, v in sortTable do
+		table.insert(Names, bedwars.BedwarsKitMeta[v].name)
+	end
 	
 	AutoKit = vape.Categories.Utility:CreateModule({
-		Name = 'AutoKit',
+		Name = 'Auto Kit',
+		Alias = Names,
 		Function = function(callback)
 			if callback then
 				repeat task.wait() until store.equippedKit ~= '' and store.matchState ~= 0 or (not AutoKit.Enabled)
@@ -4458,13 +4406,7 @@ run(function()
 		Tooltip = 'Automatically uses kit abilities.'
 	})
 	Legit = AutoKit:CreateToggle({Name = 'Legit Range'})
-	local sortTable = {}
-	for i in AutoKitFunctions do
-		table.insert(sortTable, i)
-	end
-	table.sort(sortTable, function(a, b)
-		return bedwars.BedwarsKitMeta[a].name < bedwars.BedwarsKitMeta[b].name
-	end)
+	
 	for _, v in sortTable do
 		Toggles[v] = AutoKit:CreateToggle({
 			Name = bedwars.BedwarsKitMeta[v].name,
