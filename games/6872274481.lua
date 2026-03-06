@@ -1364,7 +1364,7 @@ run(function()
 				if not bedwars.AppController:isLayerOpen(bedwars.UILayers.MAIN) then
 					local blockPlacer = bedwars.BlockPlacementController.blockPlacer
 					if store.hand.toolType == 'block' and blockPlacer then
-						if (workspace:GetServerTimeNow() - bedwars.BlockCpsController.lastPlaceTimestamp) >= ((1 / 12) * 0.5) then
+						if (workspace:GetServerTimeNow() - bedwars.BlockCpsController.lastPlaceTimestamp) >= ((1 / 12) * 0.25) then
 							local mouseinfo = blockPlacer.clientManager:getBlockSelector():getMouseInfo(0)
 							if mouseinfo and mouseinfo.placementPosition == mouseinfo.placementPosition then
 								task.spawn(blockPlacer.placeBlock, blockPlacer, mouseinfo.placementPosition)
@@ -8003,7 +8003,6 @@ run(function()
 	local TextureRemover
 	local effects, util = {}, {}
 	local savedMaterials, savedReflectance, savedDecals = {}, {}, {}
-	local textureConnection = nil
 
 	FPSBoost = vape.Legit:CreateModule({
 		Name = 'FPS Boost',
@@ -8050,7 +8049,6 @@ run(function()
 					settings().Rendering.QualityLevel = 1
 
 					for _, v in pairs(game:GetDescendants()) do
-						runService.Heartbeat:Wait()
 						if v:IsA('Part') or v:IsA('UnionOperation') or v:IsA('MeshPart') or v:IsA('CornerWedgePart') or v:IsA('TrussPart') then
 							savedMaterials[v] = v.Material
 							savedReflectance[v] = v.Reflectance
@@ -8072,32 +8070,6 @@ run(function()
 							v.Enabled = false
 						end
 					end
-
-					textureConnection = workspace.DescendantAdded:Connect(function(child)
-						task.spawn(function()
-							if child:IsA('Part') or child:IsA('UnionOperation') or child:IsA('MeshPart') or child:IsA('CornerWedgePart') or child:IsA('TrussPart') then
-								runService.Heartbeat:Wait()
-								savedMaterials[child] = child.Material
-								savedReflectance[child] = child.Reflectance
-								child.Material = 'Plastic'
-								child.Reflectance = 0
-							elseif child:IsA('Decal') then
-								runService.Heartbeat:Wait()
-								savedDecals[child] = child.Transparency
-								child.Transparency = 1
-							elseif child:IsA('ParticleEmitter') or child:IsA('Trail') then
-								runService.Heartbeat:Wait()
-								child.Lifetime = NumberRange.new(0)
-							elseif child:IsA('Explosion') then
-								runService.Heartbeat:Wait()
-								child.BlastPressure = 1
-								child.BlastRadius = 1
-							elseif child:IsA('ForceField') or child:IsA('Sparkles') or child:IsA('Smoke') or child:IsA('Fire') then
-								runService.Heartbeat:Wait()
-								child:Destroy()
-							end
-						end)
-					end)
 				end
 
 				repeat task.wait() until store.matchState ~= 0
@@ -8120,10 +8092,6 @@ run(function()
 				end
 
 				-- Restore Textures
-				if textureConnection then
-					textureConnection:Disconnect()
-					textureConnection = nil
-				end
 				for v, mat in pairs(savedMaterials) do
 					pcall(function() v.Material = mat end)
 				end
